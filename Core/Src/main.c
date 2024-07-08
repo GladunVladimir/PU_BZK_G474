@@ -103,18 +103,29 @@ static TIMER_t TIMER_LED_Data;
 static TIMER_t TIMER_CAN_Data;
 static bool_t bl_TIMER_CAN;
 
-//static bool_t bl_Drive_Managment_Reset_Flag;
-//static TON_t TON_Driver_Managment_Reset_Flag_DATA;
+static bool_t bl_Drive_Managment_Reset_Flag;
+static TON_t TON_Driver_Managment_Reset_Flag_DATA;
 
 typedef struct
 {
-  bool_t QF1_position;
-  bool_t QF2_position;
-  bool_t QF3_position;
-  bool_t QF4_position;
-}DRIVER_POS_t;
+  GPIO_TypeDef* GPIO_Port_Enable;
+  uint16_t GPIO_Pin_Enable;
+  GPIO_TypeDef* GPIO_Port_Disable;
+  uint16_t GPIO_Pin_Disable;
+  uint32_t Start_Time;
+  uint32_t Protection_Start_Time;
+  uint8_t State;
+}DRIVER_t;
 
-static DRIVER_POS_t DRIVER_POS_Driver_Position;
+
+DRIVER_t Drivers[4] = {
+    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0},
+    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0},
+    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0},
+    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0}
+};
+
+static DRIVER_t Driver;
 
 bool_t bl_Output_Value[64U];
 
@@ -359,16 +370,82 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
   );
 }
 
-
-
-// Записываем значения выходов индикации положений QF1, QF2, QF3, QF4
-void getPositionDriver(DRIVER_POS_t* DRIVER_POS_DATA)
-{
-  DRIVER_POS_DATA->QF1_position = EPRO_Test_Bit(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 0);
-  DRIVER_POS_DATA->QF2_position = EPRO_Test_Bit(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 1);
-  DRIVER_POS_DATA->QF3_position = EPRO_Test_Bit(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 2);
-  DRIVER_POS_DATA->QF4_position = EPRO_Test_Bit(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 3);
+void UpdateDriverStates() {
+    Drivers[0].State = MODULE_BZK_RX.bl_QF1;
+    Drivers[1].State = MODULE_BZK_RX.bl_QF2;
+    Drivers[2].State = MODULE_BZK_RX.bl_QF3;
+    Drivers[3].State = MODULE_BZK_RX.bl_QF4;
 }
+
+// Функция для включения защиты
+void EnableProtection() {
+    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);
+}
+
+// Функция для отключения защиты
+void DisableProtection() {
+    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);
+}
+
+// Функция для включения драйвера
+void EnableDriver(DRIVER_t* driver, uint32_t currentTime) {
+    if (driver->State == 0) {
+        HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_SET);
+        driver->Start_Time = currentTime;
+        driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
+    }
+}
+
+// Функция для выключения драйвера
+void DisableDriver(DRIVER_t* driver, uint32_t currentTime) {
+    if (driver->State == 1) {
+        if (currentTime >= driver->Start_Time + 750) {
+            DisableProtection(); // Отключение защиты за 250 мс до выключения драйвера
+        }
+        if (currentTime >= driver->Start_Time + 1000) {
+            HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(driver->GPIO_Port_Disable, driver->GPIO_Pin_Disable, GPIO_PIN_SET); // Передача сигнала отключения
+        }
+    }
+}
+
+
+// Основная функция обработки
+void ProcessDrivers(uint32_t currentTime) {
+    static uint8_t currentDriverIndex = 0;
+    static uint8_t nextDriverIndex = 0;
+    static uint8_t isProcessing = 0;
+
+    UpdateDriverStates();
+
+    for (int i = 0; i < 4; i++) {
+        if (bl_Output_Value[i] != 0x00) {
+            nextDriverIndex = i;
+        }
+    }
+
+    if (!isProcessing && currentDriverIndex < 4 && bl_Output_Value[currentDriverIndex] != 0x00) {
+        EnableDriver(&Drivers[currentDriverIndex], currentTime);
+        isProcessing = 1;
+    }
+
+    if (isProcessing) {
+        if (currentTime >= Drivers[currentDriverIndex].Protection_Start_Time) {
+            EnableProtection();
+        }
+        if (currentTime >= Drivers[currentDriverIndex].Start_Time + 1000) {
+            DisableDriver(&Drivers[currentDriverIndex], currentTime);
+            currentDriverIndex++;
+            isProcessing = 0;
+        }
+    }
+
+    if (currentDriverIndex == 4) {
+        currentDriverIndex = nextDriverIndex;
+    }
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -406,6 +483,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   // Начальная настройка
   Main_Init();
+  uint32_t currentTime = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -417,6 +495,8 @@ int main(void)
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
 
+
+
   // Фоновый цикл
   while (1)
   {
@@ -425,6 +505,7 @@ int main(void)
     HAL_IWDG_Refresh(&hiwdg);
 #endif
 
+    currentTime = HAL_GetTick();
 
     // Сигнал для начального включения светодиодов
     bl_TP_Init_End = TP(bl_Init_End, 5000UL, &TP_Init_End_DATA);
@@ -472,6 +553,8 @@ int main(void)
       }
     }
 
+    ProcessDrivers(currentTime);
+
 //    // Задаём состояние дискретных выходов
 //    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);
 //    HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[6U]);
@@ -487,15 +570,12 @@ int main(void)
 //    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]);
 
 
-    getPositionDriver(&DRIVER_POS_Driver_Position);
+
 
 //    // Управление драйверами
 //    if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] == 0x00)
 //    {
-//        if (DRIVER_POS_Driver_Position.QF1_position == 0 &&
-//            DRIVER_POS_Driver_Position.QF2_position == 0 &&
-//            DRIVER_POS_Driver_Position.QF3_position == 0 &&
-//            DRIVER_POS_Driver_Position.QF4_position == 0){}
+//
 //        HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
 //
 //       bl_Drive_Managment_Reset_Flag = TRUE;
@@ -1323,10 +1403,10 @@ int main(void)
                   MODULE_BZK_TX.bl_X6_10_IN = 1;                                     // ППН1
                   MODULE_BZK_TX.bl_X6_11_IN = 1;                                     // ППН2
                   MODULE_BZK_TX.bl_X6_12_IN = 1;                                     // ППН3
-                  MODULE_BZK_TX.bl_X5_11_IN = 1;                                     // QF1
-                  MODULE_BZK_TX.bl_X5_12_IN = 1;                                     // QF2
-                  MODULE_BZK_TX.bl_X5_13_IN = 1;                                     // QF3
-                  MODULE_BZK_TX.bl_X5_14_IN = 1;                                     // QF4
+                  MODULE_BZK_TX.bl_X5_11_IN = 0;                                     // QF1
+                  MODULE_BZK_TX.bl_X5_12_IN = 0;                                     // QF2
+                  MODULE_BZK_TX.bl_X5_13_IN = 0;                                     // QF3
+                  MODULE_BZK_TX.bl_X5_14_IN = 0;                                     // QF4
                   MODULE_BZK_TX.bl_X2_4_OUT = bl_Output_Value[4U];                   // KM7
                   MODULE_BZK_TX.bl_X2_2_OUT = bl_Output_Value[5U];                   // KM8
                   MODULE_BZK_TX.bl_X3_9_OUT = bl_Output_Value[6U];                   // KM2
