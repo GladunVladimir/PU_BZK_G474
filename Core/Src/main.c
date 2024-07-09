@@ -371,124 +371,97 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
 }
 
 void UpdateDriverStates() {
-    Drivers[0].State = MODULE_BZK_RX.bl_QF1;
-    Drivers[1].State = MODULE_BZK_RX.bl_QF2;
-    Drivers[2].State = MODULE_BZK_RX.bl_QF3;
-    Drivers[3].State = MODULE_BZK_RX.bl_QF4;
+    Drivers[0].State = EPRO_Test_Bit(ui32_Input_Value, 7);
+    Drivers[1].State = EPRO_Test_Bit(ui32_Input_Value, 8);
+    Drivers[2].State = EPRO_Test_Bit(ui32_Input_Value, 9);
+    Drivers[3].State = EPRO_Test_Bit(ui32_Input_Value, 10);
 }
 
 // Функция для включения защиты
 void EnableProtection() {
-//    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);
-      MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+  //     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); //включение защиты
+         MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+
+
 }
 
 // Функция для отключения защиты
 void DisableProtection() {
-//    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);
-      MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+//     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); //отключение защиты
+       MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+
 }
 
 // Функция для включения драйвера
-void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currDriverIndex) {
-    if (driver->State == 0) {
-//        HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_SET);
-
-      if (currDriverIndex == 0){
-      MODULE_BZK_TX.bl_X5_3_OUT = 1;
-      MODULE_BZK_TX.bl_X5_4_OUT = 0;
-      }
-      else if (currDriverIndex == 1){
-      MODULE_BZK_TX.bl_X5_3_OUT = 1;
-      MODULE_BZK_TX.bl_X5_4_OUT = 0;
-      }
-      else if (currDriverIndex == 2){
-      MODULE_BZK_TX.bl_X5_3_OUT = 1;
-      MODULE_BZK_TX.bl_X5_4_OUT = 0;
-      }
-      else if (currDriverIndex == 3){
-      MODULE_BZK_TX.bl_X5_3_OUT = 1;
-      MODULE_BZK_TX.bl_X5_4_OUT = 0;
-      }
-
-        driver->Start_Time = currentTime;
-        driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
+void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
+    switch (currentDriverIndex) {
+        case 0:
+            MODULE_BZK_TX.bl_X5_3_OUT = 1;
+            break;
+        case 1:
+            MODULE_BZK_TX.bl_X5_5_OUT = 1;
+            break;
+        case 2:
+            MODULE_BZK_TX.bl_X5_7_OUT = 1;
+            break;
+        case 3:
+            MODULE_BZK_TX.bl_X5_9_OUT = 1;
+            break;
     }
+    driver->Start_Time = currentTime;
+    driver->Protection_Start_Time = currentTime + 250; // Protection enabled after 250 ms
+    driver->State = 1;
 }
+
 
 // Функция для выключения драйвера
-void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currDriverIndex) {
-    if (driver->State == 1) {
-        if (currentTime >= driver->Start_Time + 750) {
-            DisableProtection(); // Отключение защиты за 250 мс до выключения драйвера
-        }
-        if (currentTime >= driver->Start_Time + 1000) {
-//            HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_RESET);
-//            HAL_GPIO_WritePin(driver->GPIO_Port_Disable, driver->GPIO_Pin_Disable, GPIO_PIN_SET); // Передача сигнала отключения
-
-          if (currDriverIndex == 0){
-          MODULE_BZK_TX.bl_X5_3_OUT = 0;
-          MODULE_BZK_TX.bl_X5_4_OUT = 1;
-          }
-          else if (currDriverIndex == 1){
-          MODULE_BZK_TX.bl_X5_3_OUT = 0;
-          MODULE_BZK_TX.bl_X5_4_OUT = 1;
-          }
-          else if (currDriverIndex == 2){
-          MODULE_BZK_TX.bl_X5_3_OUT = 0;
-          MODULE_BZK_TX.bl_X5_4_OUT = 1;
-          }
-          else if (currDriverIndex == 3){
-          MODULE_BZK_TX.bl_X5_3_OUT = 0;
-          MODULE_BZK_TX.bl_X5_4_OUT = 1;
-          }
-
-        }
+void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
+    switch (currentDriverIndex) {
+        case 0:
+            MODULE_BZK_TX.bl_X5_3_OUT = 0;
+            MODULE_BZK_TX.bl_X5_4_OUT = 1;
+            break;
+        case 1:
+            MODULE_BZK_TX.bl_X5_5_OUT = 0;
+            MODULE_BZK_TX.bl_X5_6_OUT = 1;
+            break;
+        case 2:
+            MODULE_BZK_TX.bl_X5_7_OUT = 0;
+            MODULE_BZK_TX.bl_X5_8_OUT = 1;
+            break;
+        case 3:
+            MODULE_BZK_TX.bl_X5_9_OUT = 0;
+            MODULE_BZK_TX.bl_X5_10_OUT = 1;
+            break;
     }
+    driver->State = 0;
 }
-
 
 // Основная функция обработки
 void ProcessDrivers(uint32_t currentTime) {
-    static uint8_t currentDriverIndex = 0;
-    static uint8_t nextDriverIndex = 0;
-    static uint8_t isProcessing = 0;
-
     UpdateDriverStates();
 
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] != 0x00) {
-            nextDriverIndex = i;
+            if (Drivers[i].State == 0) {
+                EnableDriver(&Drivers[i], currentTime, i);
+            }
+
+            if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].State == 1) {
+                EnableProtection();
+            }
+        } else {
+            if (Drivers[i].State == 1) {
+                DisableDriver(&Drivers[i], currentTime, i);
+            }
+
+            if (currentTime >= Drivers[i].Start_Time + 1000 && Drivers[i].State == 0) {
+                DisableProtection();
+            }
         }
-    }
-
-    if (!isProcessing && currentDriverIndex < 4 && bl_Output_Value[currentDriverIndex] != 0x00) {
-        EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
-
-
-        isProcessing = 1;
-    }
-
-    if (isProcessing) {
-        if (currentTime >= Drivers[currentDriverIndex].Protection_Start_Time) {
-            EnableProtection();
-        }
-        if (currentTime >= Drivers[currentDriverIndex].Start_Time + 1000) {
-            DisableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
-
-
-
-
-
-            currentDriverIndex++;
-            isProcessing = 0;
-        }
-    }
-
-    if (currentDriverIndex == 4) {
-        currentDriverIndex = nextDriverIndex;
     }
 }
+
 
 
 /* USER CODE END 0 */
@@ -545,12 +518,14 @@ int main(void)
   // Фоновый цикл
   while (1)
   {
+
+    currentTime = HAL_GetTick();
 #ifdef HAL_IWDG_MODULE_ENABLED
     // Сброс сторожевого таймера
     HAL_IWDG_Refresh(&hiwdg);
 #endif
 
-    currentTime = HAL_GetTick();
+
 
     // Сигнал для начального включения светодиодов
     bl_TP_Init_End = TP(bl_Init_End, 5000UL, &TP_Init_End_DATA);
@@ -595,7 +570,7 @@ int main(void)
       }
     }
 
-    ProcessDrivers(currentTime);
+
 
 //    // Задаём состояние дискретных выходов
 //    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);
@@ -1389,21 +1364,23 @@ int main(void)
 //  }
 
 
-//          // Считываем состояние дискретных входов
-//          ui32_Input_Value =
-//              (
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 1) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 2) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 3) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 4) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 5) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 6) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 7) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 8) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 9) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 10) |
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 11)
-//              );
+          // Считываем состояние дискретных входов
+          ui32_Input_Value =
+              (
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 1) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 2) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 3) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 4) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 5) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 6) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 7) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 8) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 9) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 10) |
+                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 11)
+              );
+
+          ProcessDrivers(currentTime);
 
 //                  MODULE_BZK_TX.bl_X6_1_IN = EPRO_Test_Bit(ui32_Input_Value, 0);     // АВДУ1
 //                  MODULE_BZK_TX.bl_X6_3_IN = EPRO_Test_Bit(ui32_Input_Value, 1);     // АВДУ2
