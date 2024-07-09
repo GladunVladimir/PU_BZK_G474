@@ -379,32 +379,70 @@ void UpdateDriverStates() {
 
 // Функция для включения защиты
 void EnableProtection() {
-    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);
+      MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
 }
 
 // Функция для отключения защиты
 void DisableProtection() {
-    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);
+//    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);
+      MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
 }
 
 // Функция для включения драйвера
-void EnableDriver(DRIVER_t* driver, uint32_t currentTime) {
+void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currDriverIndex) {
     if (driver->State == 0) {
-        HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_SET);
+//        HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_SET);
+
+      if (currDriverIndex == 0){
+      MODULE_BZK_TX.bl_X5_3_OUT = 1;
+      MODULE_BZK_TX.bl_X5_4_OUT = 0;
+      }
+      else if (currDriverIndex == 1){
+      MODULE_BZK_TX.bl_X5_3_OUT = 1;
+      MODULE_BZK_TX.bl_X5_4_OUT = 0;
+      }
+      else if (currDriverIndex == 2){
+      MODULE_BZK_TX.bl_X5_3_OUT = 1;
+      MODULE_BZK_TX.bl_X5_4_OUT = 0;
+      }
+      else if (currDriverIndex == 3){
+      MODULE_BZK_TX.bl_X5_3_OUT = 1;
+      MODULE_BZK_TX.bl_X5_4_OUT = 0;
+      }
+
         driver->Start_Time = currentTime;
         driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
     }
 }
 
 // Функция для выключения драйвера
-void DisableDriver(DRIVER_t* driver, uint32_t currentTime) {
+void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currDriverIndex) {
     if (driver->State == 1) {
         if (currentTime >= driver->Start_Time + 750) {
             DisableProtection(); // Отключение защиты за 250 мс до выключения драйвера
         }
         if (currentTime >= driver->Start_Time + 1000) {
-            HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(driver->GPIO_Port_Disable, driver->GPIO_Pin_Disable, GPIO_PIN_SET); // Передача сигнала отключения
+//            HAL_GPIO_WritePin(driver->GPIO_Port_Enable, driver->GPIO_Pin_Enable, GPIO_PIN_RESET);
+//            HAL_GPIO_WritePin(driver->GPIO_Port_Disable, driver->GPIO_Pin_Disable, GPIO_PIN_SET); // Передача сигнала отключения
+
+          if (currDriverIndex == 0){
+          MODULE_BZK_TX.bl_X5_3_OUT = 0;
+          MODULE_BZK_TX.bl_X5_4_OUT = 1;
+          }
+          else if (currDriverIndex == 1){
+          MODULE_BZK_TX.bl_X5_3_OUT = 0;
+          MODULE_BZK_TX.bl_X5_4_OUT = 1;
+          }
+          else if (currDriverIndex == 2){
+          MODULE_BZK_TX.bl_X5_3_OUT = 0;
+          MODULE_BZK_TX.bl_X5_4_OUT = 1;
+          }
+          else if (currDriverIndex == 3){
+          MODULE_BZK_TX.bl_X5_3_OUT = 0;
+          MODULE_BZK_TX.bl_X5_4_OUT = 1;
+          }
+
         }
     }
 }
@@ -425,7 +463,9 @@ void ProcessDrivers(uint32_t currentTime) {
     }
 
     if (!isProcessing && currentDriverIndex < 4 && bl_Output_Value[currentDriverIndex] != 0x00) {
-        EnableDriver(&Drivers[currentDriverIndex], currentTime);
+        EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
+
+
         isProcessing = 1;
     }
 
@@ -434,7 +474,12 @@ void ProcessDrivers(uint32_t currentTime) {
             EnableProtection();
         }
         if (currentTime >= Drivers[currentDriverIndex].Start_Time + 1000) {
-            DisableDriver(&Drivers[currentDriverIndex], currentTime);
+            DisableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
+
+
+
+
+
             currentDriverIndex++;
             isProcessing = 0;
         }
@@ -513,9 +558,6 @@ int main(void)
     // Настраиваем таймеры
     bl_TIMER_LED = TIMER(200UL, &TIMER_LED_Data);
     bl_TIMER_CAN = TIMER(100UL, &TIMER_CAN_Data);     //период 100 милисекунд
-
-
-
 
 
     // Обработка принятой информации по сети CAN
@@ -1419,16 +1461,16 @@ int main(void)
                   MODULE_BZK_TX.bl_X2_10_OUT = bl_Output_Value[13U];                 // KL2
                   MODULE_BZK_TX.bl_X2_8_OUT = bl_Output_Value[14U];                  // KL3
                   MODULE_BZK_TX.bl_X2_7_OUT = bl_Output_Value[15U];                  // KL4
-                  MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;                                // QF защита
-                  MODULE_BZK_TX.bl_X5_3_OUT = 1;                                     // QF1 вкл.
-                  MODULE_BZK_TX.bl_X5_4_OUT = 1;                                     // QF1 откл.
-                  MODULE_BZK_TX.bl_X5_5_OUT = 1;                                     // QF2 вкл.
-                  MODULE_BZK_TX.bl_X5_6_OUT = 1;                                     // QF2 откл.
-                  MODULE_BZK_TX.bl_X5_7_OUT = 1;                                     // QF3 вкл.
-                  MODULE_BZK_TX.bl_X5_8_OUT = 1;                                     // QF3 откл.
-                  MODULE_BZK_TX.bl_X5_9_OUT = 1;                                     // QF4 вкл.
-                  MODULE_BZK_TX.bl_X5_10_OUT = 1;                                    // QF4 откл.
-                  MODULE_BZK_TX.bl_X5_10_OUT = 1;                                    // QF4 откл.
+//                  MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;                                // QF защита
+//                  MODULE_BZK_TX.bl_X5_3_OUT = 1;                                     // QF1 вкл.
+//                  MODULE_BZK_TX.bl_X5_4_OUT = 1;                                     // QF1 откл.
+//                  MODULE_BZK_TX.bl_X5_5_OUT = 1;                                     // QF2 вкл.
+//                  MODULE_BZK_TX.bl_X5_6_OUT = 1;                                     // QF2 откл.
+//                  MODULE_BZK_TX.bl_X5_7_OUT = 1;                                     // QF3 вкл.
+//                  MODULE_BZK_TX.bl_X5_8_OUT = 1;                                     // QF3 откл.
+//                  MODULE_BZK_TX.bl_X5_9_OUT = 1;                                     // QF4 вкл.
+//                  MODULE_BZK_TX.bl_X5_10_OUT = 1;                                    // QF4 откл.
+//                  MODULE_BZK_TX.bl_X5_10_OUT = 1;                                    // QF4 откл.
 
 
 
