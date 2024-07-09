@@ -371,16 +371,17 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
 }
 
 void UpdateDriverStates() {
-    Drivers[0].State = EPRO_Test_Bit(ui32_Input_Value, 7);
-    Drivers[1].State = EPRO_Test_Bit(ui32_Input_Value, 8);
-    Drivers[2].State = EPRO_Test_Bit(ui32_Input_Value, 9);
-    Drivers[3].State = EPRO_Test_Bit(ui32_Input_Value, 10);
+    Drivers[0].State = MODULE_BZK_TX.bl_X5_3_OUT;
+    Drivers[1].State = MODULE_BZK_TX.bl_X5_5_OUT;
+    Drivers[2].State = MODULE_BZK_TX.bl_X5_7_OUT;
+    Drivers[3].State = MODULE_BZK_TX.bl_X5_9_OUT;
 }
 
 // Функция для включения защиты
 void EnableProtection() {
   //     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); //включение защиты
          MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+
 
 
 }
@@ -437,6 +438,24 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     driver->State = 0;
 }
 
+void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
+  switch (currentDriverIndex) {
+      case 0:
+          MODULE_BZK_TX.bl_X5_4_OUT = 0;
+          break;
+      case 1:
+          MODULE_BZK_TX.bl_X5_6_OUT = 0;
+          break;
+      case 2:
+          MODULE_BZK_TX.bl_X5_8_OUT = 0;
+          break;
+      case 3:
+          MODULE_BZK_TX.bl_X5_10_OUT = 0;
+          break;
+  }
+
+}
+
 
 // Основная функция обработки
 void ProcessDrivers(uint32_t currentTime) {
@@ -455,10 +474,13 @@ void ProcessDrivers(uint32_t currentTime) {
             // Проверка на отключение драйвера через 1 секунду.
             if (currentTime >= Drivers[i].Start_Time + 1000 && Drivers[i].State == 1) {
                 DisableDriver(&Drivers[i], currentTime, i);
+//                ResetDisablingDriver(&Drivers[i], i);
+
             }
         } else {
             if (Drivers[i].State == 1) {
                 DisableDriver(&Drivers[i], currentTime, i);
+//                ResetDisablingDriver(&Drivers[i], i);
             }
         }
     }
@@ -517,6 +539,8 @@ int main(void)
 
 
 
+
+
   // Фоновый цикл
   while (1)
   {
@@ -530,7 +554,7 @@ int main(void)
 
 
     // Сигнал для начального включения светодиодов
-    bl_TP_Init_End = TP(bl_Init_End, 5000UL, &TP_Init_End_DATA);
+    bl_TP_Init_End = TP(bl_Init_End, 1000UL, &TP_Init_End_DATA);
 
     // Настраиваем таймеры
     bl_TIMER_LED = TIMER(200UL, &TIMER_LED_Data);
@@ -1366,21 +1390,21 @@ int main(void)
 //  }
 
 
-          // Считываем состояние дискретных входов
-          ui32_Input_Value =
-              (
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 1) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 2) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 3) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 4) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 5) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 6) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 7) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 8) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 9) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 10) |
-                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 11)
-              );
+//          // Считываем состояние дискретных входов
+//          ui32_Input_Value =
+//              (
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 1) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 2) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 3) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 4) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 5) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 6) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 7) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 8) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 9) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 10) |
+//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 11)
+//              );
 
           ProcessDrivers(currentTime);
 
