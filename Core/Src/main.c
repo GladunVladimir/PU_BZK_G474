@@ -451,13 +451,14 @@ void ProcessDrivers(uint32_t currentTime) {
             if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].State == 1) {
                 EnableProtection();
             }
+
+            // Проверка на отключение драйвера через 1 секунду.
+            if (currentTime >= Drivers[i].Start_Time + 1000 && Drivers[i].State == 1) {
+                DisableDriver(&Drivers[i], currentTime, i);
+            }
         } else {
             if (Drivers[i].State == 1) {
                 DisableDriver(&Drivers[i], currentTime, i);
-            }
-
-            if (currentTime >= Drivers[i].Start_Time + 1000 && Drivers[i].State == 0) {
-                DisableProtection();
             }
         }
     }
