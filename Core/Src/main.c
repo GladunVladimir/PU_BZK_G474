@@ -409,7 +409,7 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
             break;
     }
     driver->Start_Time = currentTime;
-    driver->Protection_Start_Time = currentTime + 250; // Protection enabled after 250 ms
+    driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
     driver->State = 1;
 }
 
@@ -436,6 +436,7 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     }
     driver->State = 0;
 }
+
 
 // Основная функция обработки
 void ProcessDrivers(uint32_t currentTime) {
