@@ -103,9 +103,6 @@ static TIMER_t TIMER_LED_Data;
 static TIMER_t TIMER_CAN_Data;
 static bool_t bl_TIMER_CAN;
 
-static bool_t bl_Drive_Managment_Reset_Flag;
-static TON_t TON_Driver_Managment_Reset_Flag_DATA;
-
 typedef struct
 {
   GPIO_TypeDef* GPIO_Port_Enable;
@@ -114,18 +111,18 @@ typedef struct
   uint16_t GPIO_Pin_Disable;
   uint32_t Start_Time;
   uint32_t Protection_Start_Time;
+  uint32_t Protection_Disable_Time;
+  uint32_t Disable_Start_Time;
   uint8_t State;
 }DRIVER_t;
 
 
 DRIVER_t Drivers[4] = {
-    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0},
-    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0},
-    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0},
-    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0}
+    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0, 0, 0},
+    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0, 0, 0},
+    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0, 0, 0},
+    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0, 0, 0}
 };
-
-static DRIVER_t Driver;
 
 bool_t bl_Output_Value[64U];
 
@@ -382,8 +379,6 @@ void EnableProtection() {
   //     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); //включение защиты
          MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
 
-
-
 }
 
 // Функция для отключения защиты
@@ -393,7 +388,7 @@ void DisableProtection() {
 
 }
 
-// Функция для включения драйвера
+// Function to enable driver
 void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -411,11 +406,12 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     }
     driver->Start_Time = currentTime;
     driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
+    driver->Protection_Disable_Time = 0; // Сброс времени отключения защиты
+    driver->Disable_Start_Time = 0; // Сброс начала отсчета времени отключения
     driver->State = 1;
 }
 
-
-// Функция для выключения драйвера
+// Функция отключения драйвера
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -435,29 +431,40 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
             break;
     }
+    driver->Protection_Disable_Time = currentTime + 750; // Установка времени отключения защиты (250 мс до времени отключения драйвера)
+    driver->Disable_Start_Time = currentTime + 1000; // Установка времени начала отключения (1 секунда после получения сигнала)
     driver->State = 0;
 }
 
+// Функция сброса сигнала отключения драйвера
 void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
-  switch (currentDriverIndex) {
-      case 0:
-          MODULE_BZK_TX.bl_X5_4_OUT = 0;
-          break;
-      case 1:
-          MODULE_BZK_TX.bl_X5_6_OUT = 0;
-          break;
-      case 2:
-          MODULE_BZK_TX.bl_X5_8_OUT = 0;
-          break;
-      case 3:
-          MODULE_BZK_TX.bl_X5_10_OUT = 0;
-          break;
-  }
-
+    switch (currentDriverIndex) {
+        case 0:
+            MODULE_BZK_TX.bl_X5_4_OUT = 0;
+            break;
+        case 1:
+            MODULE_BZK_TX.bl_X5_6_OUT = 0;
+            break;
+        case 2:
+            MODULE_BZK_TX.bl_X5_8_OUT = 0;
+            break;
+        case 3:
+            MODULE_BZK_TX.bl_X5_10_OUT = 0;
+            break;
+    }
 }
 
+// Проверка на состояние активности какой-либо драйвера
+bool AnyDriverActive() {
+    for (int i = 0; i < 4; i++) {
+        if (Drivers[i].State == 1) {
+            return true;
+        }
+    }
+    return false;
+}
 
-// Основная функция обработки
+// Основная функция обработки положений драйверов
 void ProcessDrivers(uint32_t currentTime) {
     UpdateDriverStates();
 
@@ -470,20 +477,32 @@ void ProcessDrivers(uint32_t currentTime) {
             if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].State == 1) {
                 EnableProtection();
             }
-
-            // Проверка на отключение драйвера через 1 секунду.
-            if (currentTime >= Drivers[i].Start_Time + 1000 && Drivers[i].State == 1) {
-                DisableDriver(&Drivers[i], currentTime, i);
-//                ResetDisablingDriver(&Drivers[i], i);
-
-            }
         } else {
             if (Drivers[i].State == 1) {
-                DisableDriver(&Drivers[i], currentTime, i);
-//                ResetDisablingDriver(&Drivers[i], i);
+                if (Drivers[i].Disable_Start_Time == 0) {
+                    Drivers[i].Disable_Start_Time = currentTime + 1000;
+                    Drivers[i].Protection_Disable_Time = currentTime + 750;
+                } else {
+                    if (currentTime >= Drivers[i].Disable_Start_Time) {
+                        DisableDriver(&Drivers[i], currentTime, i);
+                    }
+                }
+            } else {
+                if (Drivers[i].Disable_Start_Time != 0 && currentTime >= Drivers[i].Disable_Start_Time + 100) {
+                    ResetDisablingDriver(&Drivers[i], i);
+                    Drivers[i].Disable_Start_Time = 0; // Сбросить время начала отключения
+                }
             }
         }
     }
+
+    // Отключить защиту, если ни один драйвер не активен и хотя бы один драйвер был ранее активен
+    static bool wasAnyDriverActive = false;
+    bool isAnyDriverActive = AnyDriverActive();
+    if (!isAnyDriverActive && wasAnyDriverActive) {
+        DisableProtection();
+    }
+    wasAnyDriverActive = isAnyDriverActive;
 }
 
 
@@ -612,782 +631,6 @@ int main(void)
 //    HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[14U]);
 //    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]);
 
-
-
-
-//    // Управление драйверами
-//    if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] == 0x00)
-//    {
-//
-//        HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//       bl_Drive_Managment_Reset_Flag = TRUE;
-//       if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//       {
-//         bl_Drive_Managment_Reset_Flag = FALSE;
-//         HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); //включение защиты
-//       }
-//
-//       bl_Drive_Managment_Reset_Flag = TRUE;
-//       if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//       {
-//         bl_Drive_Managment_Reset_Flag = FALSE;
-//         HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); //отключение защиты
-//       }
-//
-//       bl_Drive_Managment_Reset_Flag = TRUE;
-//       if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//       {
-//         bl_Drive_Managment_Reset_Flag = FALSE;
-//         HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//
-//       }
-//    }
-//    else
-//    {
-//      if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] == 0x00)
-//      {
-//        HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//
-//        bl_Drive_Managment_Reset_Flag = TRUE;
-//        if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//        {
-//          bl_Drive_Managment_Reset_Flag = FALSE;
-//          HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);  // включение защиты
-//        }
-//        bl_Drive_Managment_Reset_Flag = TRUE;
-//        if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//        {
-//          bl_Drive_Managment_Reset_Flag = FALSE;
-//          HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);  // отключение защиты
-//        }
-//        bl_Drive_Managment_Reset_Flag = TRUE;
-//        if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//        {
-//          bl_Drive_Managment_Reset_Flag = FALSE;
-//          HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//        }
-//      }
-//      else
-//      {
-//        if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] == 0x00)
-//        {
-//          HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//
-//          bl_Drive_Managment_Reset_Flag = TRUE;
-//          if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//          {
-//            bl_Drive_Managment_Reset_Flag = FALSE;
-//            HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET);  // включение защиты
-//          }
-//
-//          bl_Drive_Managment_Reset_Flag = TRUE;
-//          if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//          {
-//           bl_Drive_Managment_Reset_Flag = FALSE;
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET);  // отключение защиты
-//          }
-//
-//          bl_Drive_Managment_Reset_Flag = TRUE;
-//          if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//          {
-//           bl_Drive_Managment_Reset_Flag = FALSE;
-//           HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//          }
-//        }
-//        else
-//        {
-//          if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] != 0x00)
-//          {
-//            HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//
-//            bl_Drive_Managment_Reset_Flag = TRUE;
-//            if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//            {
-//              bl_Drive_Managment_Reset_Flag = FALSE;
-//              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//            }
-//
-//            bl_Drive_Managment_Reset_Flag = TRUE;
-//            if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//            {
-//              bl_Drive_Managment_Reset_Flag = FALSE;
-//              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//            }
-//
-//            bl_Drive_Managment_Reset_Flag = TRUE;
-//            if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//            {
-//              bl_Drive_Managment_Reset_Flag = FALSE;
-//              HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//            }
-//
-//          }
-//          else
-//          {
-//            if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] != 0x00)
-//            {
-//              HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//              bl_Drive_Managment_Reset_Flag = TRUE;
-//              if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//              {
-//                bl_Drive_Managment_Reset_Flag = FALSE;
-//                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//             }
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//
-//                 HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//             }
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                 HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                 HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                bl_Drive_Managment_Reset_Flag = FALSE;
-//                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                bl_Drive_Managment_Reset_Flag = FALSE;
-//                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                 HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                 HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 2250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                bl_Drive_Managment_Reset_Flag = FALSE;
-//                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//             if (TON(bl_Drive_Managment_Reset_Flag, 2750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//             {
-//                bl_Drive_Managment_Reset_Flag = FALSE;
-//                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//             }
-//
-//             bl_Drive_Managment_Reset_Flag = TRUE;
-//              if (TON(bl_Drive_Managment_Reset_Flag, 3000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//              {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                 HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                 HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//              }
-//
-//              bl_Drive_Managment_Reset_Flag = TRUE;
-//              if (TON(bl_Drive_Managment_Reset_Flag, 3250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//              {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                 HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//              }
-//
-//              bl_Drive_Managment_Reset_Flag = TRUE;
-//              if (TON(bl_Drive_Managment_Reset_Flag, 3750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//              {
-//                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                 HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//              }
-//
-//              bl_Drive_Managment_Reset_Flag = TRUE;
-//               if (TON(bl_Drive_Managment_Reset_Flag, 4000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//               {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//               }
-//            }
-//            else
-//            {
-//              if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] == 0x00)
-//              {
-//                HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//              }
-//            else
-//            {
-//              if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] == 0x00)
-//              {
-//                HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                }
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                }
-//
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                  HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//                }
-//
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                }
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                }
-//
-//                bl_Drive_Managment_Reset_Flag = TRUE;
-//                if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                {
-//                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                  HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                }
-//              }
-//              else
-//              {
-//                if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] != 0x00)
-//                {
-//                  HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                  }
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                  }
-//
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                    HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                  }
-//
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                  }
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                  }
-//
-//                  bl_Drive_Managment_Reset_Flag = TRUE;
-//                  if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                  {
-//                    bl_Drive_Managment_Reset_Flag = FALSE;
-//                    HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                  }
-//
-//
-//                }
-//                else
-//                {
-//                  if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] != 0x00)
-//                  {
-//                    HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                    }
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                    }
-//
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                      HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                    }
-//
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                    }
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                    }
-//
-//                    bl_Drive_Managment_Reset_Flag = TRUE;
-//                    if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                    {
-//                      bl_Drive_Managment_Reset_Flag = FALSE;
-//                      HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                    }
-//                  }
-//                  else
-//                  {
-//                    if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] == 0x00)
-//                    {
-//                      HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                      if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                      {
-//                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                      }
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                      if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                      {
-//                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                      }
-//
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                      if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                      {
-//                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                        HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                        HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//                      }
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                        if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                        {
-//                          bl_Drive_Managment_Reset_Flag = FALSE;
-//                          HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                        }
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                      if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                      {
-//                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                      }
-//
-//                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                      if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                      {
-//                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                        HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                      }
-//                    }
-//                    else
-//                    {
-//                      if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] == 0x00)
-//                      {
-//                        HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//                        bl_Drive_Managment_Reset_Flag = TRUE;
-//                        if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                        {
-//                           bl_Drive_Managment_Reset_Flag = FALSE;
-//                           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                        }
-//                        bl_Drive_Managment_Reset_Flag = TRUE;
-//                        if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                        {
-//                           bl_Drive_Managment_Reset_Flag = FALSE;
-//                           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                        }
-//
-//                         bl_Drive_Managment_Reset_Flag = TRUE;
-//                         if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                         {
-//                           bl_Drive_Managment_Reset_Flag = FALSE;
-//                           HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                           HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//                         }
-//
-//                         bl_Drive_Managment_Reset_Flag = TRUE;
-//                         if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                         {
-//                            bl_Drive_Managment_Reset_Flag = FALSE;
-//                            HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                         }
-//                         bl_Drive_Managment_Reset_Flag = TRUE;
-//                         if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                         {
-//                            bl_Drive_Managment_Reset_Flag = FALSE;
-//                            HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                         }
-//
-//                          bl_Drive_Managment_Reset_Flag = TRUE;
-//                          if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                          {
-//                            bl_Drive_Managment_Reset_Flag = FALSE;
-//                            HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                            HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//                          }
-//                          bl_Drive_Managment_Reset_Flag = TRUE;
-//                          if (TON(bl_Drive_Managment_Reset_Flag, 2250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                          {
-//                             bl_Drive_Managment_Reset_Flag = FALSE;
-//                             HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                          }
-//                          bl_Drive_Managment_Reset_Flag = TRUE;
-//                          if (TON(bl_Drive_Managment_Reset_Flag, 2750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                          {
-//                             bl_Drive_Managment_Reset_Flag = FALSE;
-//                             HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                          }
-//
-//                           bl_Drive_Managment_Reset_Flag = TRUE;
-//                           if (TON(bl_Drive_Managment_Reset_Flag, 3000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                           {
-//                             bl_Drive_Managment_Reset_Flag = FALSE;
-//                             HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                           }
-//                      }
-//                      else
-//                      {
-//                        if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] != 0x00)
-//                        {
-//                          HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//
-//                          bl_Drive_Managment_Reset_Flag = TRUE;
-//                           if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                           {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                           }
-//                           bl_Drive_Managment_Reset_Flag = TRUE;
-//                           if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                           {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                           }
-//
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                              HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//                            }
-//
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                            }
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                            }
-//
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                              HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                            }
-//
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 2250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                            }
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 2750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                            }
-//
-//                            bl_Drive_Managment_Reset_Flag = TRUE;
-//                            if (TON(bl_Drive_Managment_Reset_Flag, 3000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                            {
-//                              bl_Drive_Managment_Reset_Flag = FALSE;
-//                              HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                            }
-//                        }
-//                        else
-//                         {
-//                           if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] == 0x00)
-//                           {
-//                             HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//                             bl_Drive_Managment_Reset_Flag = TRUE;
-//                              if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                              {
-//                                bl_Drive_Managment_Reset_Flag = FALSE;
-//                                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                              }
-//                              bl_Drive_Managment_Reset_Flag = TRUE;
-//                              if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                              {
-//                                bl_Drive_Managment_Reset_Flag = FALSE;
-//                                HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                              }
-//
-//                              bl_Drive_Managment_Reset_Flag = TRUE;
-//                              if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                              {
-//                                bl_Drive_Managment_Reset_Flag = FALSE;
-//                                HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                                HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//                              }
-//
-//                              bl_Drive_Managment_Reset_Flag = TRUE;
-//                               if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                               {
-//                                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                                 HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                               }
-//                               bl_Drive_Managment_Reset_Flag = TRUE;
-//                               if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                               {
-//                                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                                 HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                               }
-//
-//                               bl_Drive_Managment_Reset_Flag = TRUE;
-//                               if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                               {
-//                                 bl_Drive_Managment_Reset_Flag = FALSE;
-//                                 HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                               }
-//                         }
-//                           else
-//                            {
-//                              if (bl_Output_Value[0U] == 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] != 0x00)
-//                              {
-//                                HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                }
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                }
-//
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                                  HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                                }
-//
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                }
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                }
-//
-//                                bl_Drive_Managment_Reset_Flag = TRUE;
-//                                if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                {
-//                                  bl_Drive_Managment_Reset_Flag = FALSE;
-//                                  HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                                }
-//                            }
-//                              else
-//                               {
-//                                 if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] != 0x00 && bl_Output_Value[2U] == 0x00 && bl_Output_Value[3U] != 0x00)
-//                                 {
-//                                   HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                   }
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                   }
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                                     HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, GPIO_PIN_SET);
-//                                   }
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                   }
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                   }
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, GPIO_PIN_SET);
-//                                     HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                                   }
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 2250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                   }
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 2750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     bl_Drive_Managment_Reset_Flag = FALSE;
-//                                     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                   }
-//
-//                                   bl_Drive_Managment_Reset_Flag = TRUE;
-//                                   if (TON(bl_Drive_Managment_Reset_Flag, 3000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                   {
-//                                     HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                                   }
-//                               }
-//                                 else
-//                                  {
-//                                    if (bl_Output_Value[0U] != 0x00 && bl_Output_Value[1U] == 0x00 && bl_Output_Value[2U] != 0x00 && bl_Output_Value[3U] != 0x00)
-//                                    {
-//                                      HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, GPIO_PIN_SET);
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                      }
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                      }
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 1000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, GPIO_PIN_SET);
-//                                        HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, GPIO_PIN_SET);
-//                                      }
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 1250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                      }
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 1750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                      }
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 2000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, GPIO_PIN_SET);
-//                                        HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, GPIO_PIN_SET);
-//                                      }
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 2250UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); // включение защиты
-//                                      }
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 2750UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        bl_Drive_Managment_Reset_Flag = FALSE;
-//                                        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); // отключение защиты
-//                                      }
-//
-//                                      bl_Drive_Managment_Reset_Flag = TRUE;
-//                                      if (TON(bl_Drive_Managment_Reset_Flag, 3000UL, &TON_Driver_Managment_Reset_Flag_DATA))
-//                                      {
-//                                        HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, GPIO_PIN_SET);
-//                                      }
-//                                  }
-//                                }
-//                               }
-//                              }
-//                            }
-//                          }
-//                       }
-//                    }
-//                 }
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
-//  }
 
 
 //          // Считываем состояние дискретных входов
