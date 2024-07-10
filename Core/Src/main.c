@@ -390,7 +390,7 @@ void DisableProtection() {
 
 }
 
-// Функция включения драйвера
+// Включение драйвера
 void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -407,13 +407,12 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
             break;
     }
     driver->Start_Time = currentTime;
-    driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 миллисекунд
-    driver->Protection_Disable_Time = 0; // Сброс времени отключения защиты
-    driver->Disable_Start_Time = 0; // Сброс времени начала отключения драйвера
-    driver->Enable_Attempts++; // Инкремент попыток включения драйвера
+    driver->Protection_Start_Time = currentTime + 250;
+    driver->Protection_Disable_Time = currentTime + 750;
+    driver->Enable_Attempts++;
 }
 
-// Функция отключения драйвера
+// Отключение драйвера
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -433,12 +432,13 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
             break;
     }
-    driver->Protection_Disable_Time = currentTime + 750; // Установка времени отключения защиты (250 мс до времени отключения драйвера)
-    driver->Disable_Start_Time = currentTime + 1000; // Установка времени начала отключения (1 секунда после получения сигнала)
-    driver->Disable_Attempts++; // Инкремент попыток отключения драйвера
+    driver->Protection_Start_Time = currentTime + 250;
+    driver->Protection_Disable_Time = currentTime + 750;
+    driver->Disable_Start_Time = currentTime + 1000;
+    driver->Disable_Attempts++;
 }
 
-// Функция сброса сигнала отключения драйвера
+// Сброс сигнала отключения драйвера
 void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -466,52 +466,66 @@ bool AnyDriverActive() {
     return false;
 }
 
-// Основная функция обработки драйверов
-void ProcessDrivers(uint32_t currentTime) {
-    UpdateDriverStates();
-
+// Обработка включения драйверов
+void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
-        if (bl_Output_Value[i] != 0x00) {
-            if (Drivers[i].State == 0) {
-                if (Drivers[i].Enable_Attempts < 3) {
-                    EnableDriver(&Drivers[i], currentTime, i);
-                }
-            } else {
-                Drivers[i].Enable_Attempts = 0; // Сброс попыток, если драйвер успешно включен
+        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0) {
+            if (Drivers[i].Enable_Attempts < 3) {
+                EnableDriver(&Drivers[i], currentTime, i);
             }
-
+        } else if (Drivers[i].State == 1) {
+            Drivers[i].Enable_Attempts = 0;
             if (currentTime >= Drivers[i].Protection_Start_Time && AnyDriverActive()) {
                 EnableProtection();
             }
-        } else {
-            if (Drivers[i].State == 1) {
-                if (Drivers[i].Disable_Start_Time == 0) {
-                    Drivers[i].Disable_Start_Time = currentTime + 1000;
-                    Drivers[i].Protection_Disable_Time = currentTime + 750;
-                } else {
-                    if (currentTime >= Drivers[i].Protection_Disable_Time) {
-                        if (!AnyDriverActive()) {
-                            DisableProtection();
-                        }
-                        Drivers[i].Protection_Disable_Time = 0; // Сбросьте время отключения защиты, чтобы избежать повторных вызовов
-                    }
-                    if (currentTime >= Drivers[i].Disable_Start_Time) {
-                        if (Drivers[i].Disable_Attempts < 3) {
-                            DisableDriver(&Drivers[i], currentTime, i);
-                        }
-                    }
-                }
-            } else {
-                if (Drivers[i].Disable_Start_Time != 0 && currentTime >= Drivers[i].Disable_Start_Time + 100) {
-                    ResetDisablingDriver(&Drivers[i], i);
-                    Drivers[i].Disable_Start_Time = 0; // Сбросить время начала отключения
-                    Drivers[i].Disable_Attempts = 0; // Сброс попыток отключения
-                }
+            if (currentTime >= Drivers[i].Protection_Disable_Time) {
+                DisableProtection();
+                Drivers[i].Protection_Disable_Time = 0;
             }
         }
     }
+}
 
-    // Отключить защиту, если ни один драйвер не активен и хотя бы один драйвер был ранее активен
+// Обработка отключения драйверов
+void ProcessDriverDisabling(uint32_t currentTime) {
+    for (int i = 0; i < 4; i++) {
+        if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1) {
+            if (Drivers[i].Disable_Start_Time == 0) {
+                Drivers[i].Disable_Start_Time = currentTime + 1000;
+                Drivers[i].Protection_Start_Time = currentTime + 250;
+                Drivers[i].Protection_Disable_Time = currentTime + 750;
+            } else {
+                if (currentTime >= Drivers[i].Protection_Start_Time) {
+                    EnableProtection();
+                }
+                if (currentTime >= Drivers[i].Protection_Disable_Time) {
+                    if (!AnyDriverActive()) {
+                        DisableProtection();
+                    }
+                    Drivers[i].Protection_Disable_Time = 0;
+                }
+                if (currentTime >= Drivers[i].Disable_Start_Time) {
+                    if (Drivers[i].Disable_Attempts < 3) {
+                        DisableDriver(&Drivers[i], currentTime, i);
+                    }
+                }
+            }
+        } else if (Drivers[i].State == 0 && Drivers[i].Disable_Start_Time != 0) {
+            if (currentTime >= Drivers[i].Disable_Start_Time + 100) {
+                ResetDisablingDriver(&Drivers[i], i);
+                Drivers[i].Disable_Start_Time = 0;
+                Drivers[i].Disable_Attempts = 0;
+            }
+        }
+    }
+}
+
+// Основная функция обработки драйверов
+void ProcessDrivers(uint32_t currentTime) {
+    UpdateDriverStates();
+    ProcessDriverEnabling(currentTime);
+    ProcessDriverDisabling(currentTime);
+
     static bool wasAnyDriverActive = false;
     bool isAnyDriverActive = AnyDriverActive();
     if (!isAnyDriverActive && wasAnyDriverActive) {
