@@ -113,15 +113,17 @@ typedef struct
   uint32_t Protection_Start_Time;
   uint32_t Protection_Disable_Time;
   uint32_t Disable_Start_Time;
+  uint8_t Enable_Attempts;
+  uint8_t Disable_Attempts;
   uint8_t State;
 }DRIVER_t;
 
 
 DRIVER_t Drivers[4] = {
-    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0, 0, 0},
-    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0, 0, 0},
-    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0, 0, 0},
-    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0, 0, 0}
+    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0, 0, 0, 0},
+    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0, 0, 0, 0},
+    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0, 0, 0, 0},
+    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0, 0, 0, 0}
 };
 
 bool_t bl_Output_Value[64U];
@@ -388,7 +390,7 @@ void DisableProtection() {
 
 }
 
-// Function to enable driver
+// Функция включения драйвера
 void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -405,10 +407,10 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
             break;
     }
     driver->Start_Time = currentTime;
-    driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 мс
+    driver->Protection_Start_Time = currentTime + 250; // Защита включается через 250 миллисекунд
     driver->Protection_Disable_Time = 0; // Сброс времени отключения защиты
-    driver->Disable_Start_Time = 0; // Сброс начала отсчета времени отключения
-    driver->State = 1;
+    driver->Disable_Start_Time = 0; // Сброс времени начала отключения драйвера
+    driver->Enable_Attempts++; // Инкремент попыток включения драйвера
 }
 
 // Функция отключения драйвера
@@ -433,7 +435,7 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     }
     driver->Protection_Disable_Time = currentTime + 750; // Установка времени отключения защиты (250 мс до времени отключения драйвера)
     driver->Disable_Start_Time = currentTime + 1000; // Установка времени начала отключения (1 секунда после получения сигнала)
-    driver->State = 0;
+    driver->Disable_Attempts++; // Инкремент попыток отключения драйвера
 }
 
 // Функция сброса сигнала отключения драйвера
@@ -454,7 +456,7 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     }
 }
 
-// Проверка на состояние активности какой-либо драйвера
+// Проверка состояния активности одного из драйверов
 bool AnyDriverActive() {
     for (int i = 0; i < 4; i++) {
         if (Drivers[i].State == 1) {
@@ -464,17 +466,21 @@ bool AnyDriverActive() {
     return false;
 }
 
-// Основная функция обработки положений драйверов
+// Основная функция обработки драйверов
 void ProcessDrivers(uint32_t currentTime) {
     UpdateDriverStates();
 
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] != 0x00) {
             if (Drivers[i].State == 0) {
-                EnableDriver(&Drivers[i], currentTime, i);
+                if (Drivers[i].Enable_Attempts < 3) {
+                    EnableDriver(&Drivers[i], currentTime, i);
+                }
+            } else {
+                Drivers[i].Enable_Attempts = 0; // Сброс попыток, если драйвер успешно включен
             }
 
-            if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].State == 1) {
+            if (currentTime >= Drivers[i].Protection_Start_Time && AnyDriverActive()) {
                 EnableProtection();
             }
         } else {
@@ -483,14 +489,23 @@ void ProcessDrivers(uint32_t currentTime) {
                     Drivers[i].Disable_Start_Time = currentTime + 1000;
                     Drivers[i].Protection_Disable_Time = currentTime + 750;
                 } else {
+                    if (currentTime >= Drivers[i].Protection_Disable_Time) {
+                        if (!AnyDriverActive()) {
+                            DisableProtection();
+                        }
+                        Drivers[i].Protection_Disable_Time = 0; // Сбросьте время отключения защиты, чтобы избежать повторных вызовов
+                    }
                     if (currentTime >= Drivers[i].Disable_Start_Time) {
-                        DisableDriver(&Drivers[i], currentTime, i);
+                        if (Drivers[i].Disable_Attempts < 3) {
+                            DisableDriver(&Drivers[i], currentTime, i);
+                        }
                     }
                 }
             } else {
                 if (Drivers[i].Disable_Start_Time != 0 && currentTime >= Drivers[i].Disable_Start_Time + 100) {
                     ResetDisablingDriver(&Drivers[i], i);
                     Drivers[i].Disable_Start_Time = 0; // Сбросить время начала отключения
+                    Drivers[i].Disable_Attempts = 0; // Сброс попыток отключения
                 }
             }
         }
