@@ -113,6 +113,7 @@ typedef struct
   uint32_t Protection_Start_Time;
   uint32_t Protection_Disable_Time;
   uint32_t Disable_Start_Time;
+  uint32_t Signal_Reset_Time; // Время для сброса сигнала
   uint8_t Enable_Attempts;
   uint8_t Disable_Attempts;
   uint8_t State;
@@ -370,10 +371,10 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
 }
 
 void UpdateDriverStates() {
-    Drivers[0].State = MODULE_BZK_TX.bl_X5_3_OUT;
-    Drivers[1].State = MODULE_BZK_TX.bl_X5_5_OUT;
-    Drivers[2].State = MODULE_BZK_TX.bl_X5_7_OUT;
-    Drivers[3].State = MODULE_BZK_TX.bl_X5_9_OUT;
+    Drivers[0].State = MODULE_BZK_TX.bl_X5_3_OUT;//bl_X5_3_OUT
+    Drivers[1].State = MODULE_BZK_TX.bl_X5_5_OUT;//bl_X5_5_OUT
+    Drivers[2].State = MODULE_BZK_TX.bl_X5_7_OUT;//bl_X5_7_OUT
+    Drivers[3].State = MODULE_BZK_TX.bl_X5_9_OUT;//bl_X5_9_OUT
 }
 
 // Функция для включения защиты
@@ -395,15 +396,19 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     switch (currentDriverIndex) {
         case 0:
             MODULE_BZK_TX.bl_X5_3_OUT = 1;
+            MODULE_BZK_TX.bl_X5_11_IN = 1;
             break;
         case 1:
             MODULE_BZK_TX.bl_X5_5_OUT = 1;
+            MODULE_BZK_TX.bl_X5_12_IN = 1;
             break;
         case 2:
             MODULE_BZK_TX.bl_X5_7_OUT = 1;
+            MODULE_BZK_TX.bl_X5_13_IN = 1;
             break;
         case 3:
             MODULE_BZK_TX.bl_X5_9_OUT = 1;
+            MODULE_BZK_TX.bl_X5_14_IN = 1;
             break;
     }
     driver->Start_Time = currentTime;
@@ -418,18 +423,22 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
         case 0:
             MODULE_BZK_TX.bl_X5_3_OUT = 0;
             MODULE_BZK_TX.bl_X5_4_OUT = 1;
+            MODULE_BZK_TX.bl_X5_11_IN = 0;
             break;
         case 1:
             MODULE_BZK_TX.bl_X5_5_OUT = 0;
             MODULE_BZK_TX.bl_X5_6_OUT = 1;
+            MODULE_BZK_TX.bl_X5_12_IN = 0;
             break;
         case 2:
             MODULE_BZK_TX.bl_X5_7_OUT = 0;
             MODULE_BZK_TX.bl_X5_8_OUT = 1;
+            MODULE_BZK_TX.bl_X5_13_IN = 0;
             break;
         case 3:
             MODULE_BZK_TX.bl_X5_9_OUT = 0;
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
+            MODULE_BZK_TX.bl_X5_14_IN = 0;
             break;
     }
     driver->Protection_Start_Time = currentTime + 250;
@@ -719,11 +728,11 @@ int main(void)
                   MODULE_BZK_TX.bl_X6_6_IN = 1;                                      // КМ8
                   MODULE_BZK_TX.bl_X6_10_IN = 1;                                     // ППН1
                   MODULE_BZK_TX.bl_X6_11_IN = 1;                                     // ППН2
-                  MODULE_BZK_TX.bl_X6_12_IN = 1;                                     // ППН3
-                  MODULE_BZK_TX.bl_X5_11_IN = 0;                                     // QF1
-                  MODULE_BZK_TX.bl_X5_12_IN = 0;                                     // QF2
-                  MODULE_BZK_TX.bl_X5_13_IN = 0;                                     // QF3
-                  MODULE_BZK_TX.bl_X5_14_IN = 0;                                     // QF4
+//                  MODULE_BZK_TX.bl_X6_12_IN = 1;                                     // ППН3
+//                  MODULE_BZK_TX.bl_X5_11_IN = 0;                                     // QF1
+//                  MODULE_BZK_TX.bl_X5_12_IN = 0;                                     // QF2
+//                  MODULE_BZK_TX.bl_X5_13_IN = 0;                                     // QF3
+//                  MODULE_BZK_TX.bl_X5_14_IN = 0;                                     // QF4
                   MODULE_BZK_TX.bl_X2_4_OUT = bl_Output_Value[4U];                   // KM7
                   MODULE_BZK_TX.bl_X2_2_OUT = bl_Output_Value[5U];                   // KM8
                   MODULE_BZK_TX.bl_X3_9_OUT = bl_Output_Value[6U];                   // KM2
