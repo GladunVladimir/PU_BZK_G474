@@ -417,10 +417,10 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
             break;
     }
     driver->Start_Time = currentTime;
-
     driver->Protection_Start_Time = currentTime + 250;
     driver->Protection_Disable_Time = currentTime + 750;
-//    driver->Enable_Attempts++;
+    driver->Reset_Enable_Driver_Time = currentTime + 1000;
+    driver->Enable_Attempts++;
 }
 
 // Отключение драйвера
@@ -471,6 +471,7 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
             break;
     }
 }
+
 // Сброс сигнала отключения драйвера
 void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
@@ -501,30 +502,27 @@ bool AnyDriverActive() {
 
 // Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
-
     for (int i = 0; i < 4; i++) {
-
         if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0) {
-//            if (Drivers[i].Enable_Attempts < 3) {
-                EnableDriver(&Drivers[i], currentTime, i);
+            EnableDriver(&Drivers[i], currentTime, i);
+            EnableProtection();
         }
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time && AnyDriverActive()) {
-          ResetEnablingDriver(&Drivers[i], i);
-          Drivers[i].Reset_Enable_Driver_Time = 0;
-          HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
 
-        }
         if (Drivers[i].State == 1) {
-//            Drivers[i].Enable_Attempts = 0;
-          if (currentTime >= Drivers[i].Protection_Start_Time && AnyDriverActive()) {
-              EnableProtection();
-          }
-          if (currentTime >= Drivers[i].Protection_Disable_Time) {
-              DisableProtection();
-              Drivers[i].Protection_Disable_Time = 0;
-          }
-        }
+            if (currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+                ResetEnablingDriver(&Drivers[i], i);
+                Drivers[i].Reset_Enable_Driver_Time = 0;
+                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+            }
 
+            if (currentTime >= Drivers[i].Protection_Start_Time) {
+                EnableProtection();
+            }
+            if (currentTime >= Drivers[i].Protection_Disable_Time) {
+                DisableProtection();
+                Drivers[i].Protection_Disable_Time = 0;
+            }
+        }
     }
 }
 
@@ -536,6 +534,7 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                 Drivers[i].Disable_Start_Time = currentTime + 1000;
                 Drivers[i].Protection_Start_Time = currentTime + 250;
                 Drivers[i].Protection_Disable_Time = currentTime + 750;
+                EnableProtection();
             } else {
                 if (currentTime >= Drivers[i].Protection_Start_Time) {
                     EnableProtection();
@@ -550,7 +549,6 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                     if (Drivers[i].Disable_Attempts < 3) {
                         DisableDriver(&Drivers[i], currentTime, i);
                         HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-
                     }
                 }
             }
