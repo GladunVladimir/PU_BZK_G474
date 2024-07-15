@@ -117,7 +117,6 @@ typedef struct
   uint32_t Protection_Start_Time;
   uint32_t Protection_Disable_Time;
   uint32_t Disable_Start_Time;
-//  uint32_t Signal_Reset_Time; // Время для сброса сигнала
   uint32_t Reset_Enable_Driver_Time;
   uint8_t Enable_Attempts;
   uint8_t Disable_Attempts;
@@ -427,22 +426,18 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-            MODULE_BZK_TX.bl_X5_3_OUT = 0;
             MODULE_BZK_TX.bl_X5_4_OUT = 1;
             MODULE_BZK_TX.bl_X5_11_IN = 0;
             break;
         case 1:
-            MODULE_BZK_TX.bl_X5_5_OUT = 0;
             MODULE_BZK_TX.bl_X5_6_OUT = 1;
             MODULE_BZK_TX.bl_X5_12_IN = 0;
             break;
         case 2:
-            MODULE_BZK_TX.bl_X5_7_OUT = 0;
             MODULE_BZK_TX.bl_X5_8_OUT = 1;
             MODULE_BZK_TX.bl_X5_13_IN = 0;
             break;
         case 3:
-            MODULE_BZK_TX.bl_X5_9_OUT = 0;
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
             MODULE_BZK_TX.bl_X5_14_IN = 0;
             break;
@@ -567,13 +562,6 @@ void ProcessDrivers(uint32_t currentTime) {
     UpdateDriverStates();
     ProcessDriverEnabling(currentTime);
     ProcessDriverDisabling(currentTime);
-
-    static bool wasAnyDriverActive = false;
-    bool isAnyDriverActive = AnyDriverActive();
-    if (!isAnyDriverActive && wasAnyDriverActive) {
-        DisableProtection();
-    }
-    wasAnyDriverActive = isAnyDriverActive;
 }
 
 
