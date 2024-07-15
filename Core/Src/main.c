@@ -420,7 +420,7 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     driver->Protection_Start_Time = currentTime + 250;
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
-    driver->Enable_Attempts++;
+//    driver->Enable_Attempts++;
 }
 
 // Отключение драйвера
@@ -451,7 +451,7 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
     driver->Disable_Start_Time = currentTime + 1000;
-    driver->Disable_Attempts++;
+//    driver->Disable_Attempts++;
 }
 
 // Сброс сигнала включения драйвера
