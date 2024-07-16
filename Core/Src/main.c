@@ -376,24 +376,20 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
 }
 
 void UpdateDriverStates() {
-    Drivers[0].State = MODULE_BZK_TX.bl_X5_11_IN;//bl_X5_3_OUT
-    Drivers[1].State = MODULE_BZK_TX.bl_X5_12_IN;//bl_X5_5_OUT
-    Drivers[2].State = MODULE_BZK_TX.bl_X5_13_IN;//bl_X5_7_OUT
-    Drivers[3].State = MODULE_BZK_TX.bl_X5_14_IN;//bl_X5_9_OUT
+    Drivers[0].State = MODULE_BZK_TX.bl_X5_11_IN; // bl_X5_3_OUT
+    Drivers[1].State = MODULE_BZK_TX.bl_X5_12_IN; // bl_X5_5_OUT
+    Drivers[2].State = MODULE_BZK_TX.bl_X5_13_IN; // bl_X5_7_OUT
+    Drivers[3].State = MODULE_BZK_TX.bl_X5_14_IN; // bl_X5_9_OUT
 }
 
 // Функция для включения защиты
 void EnableProtection() {
-  //     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_SET); //включение защиты
-         MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-
+    MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
 }
 
 // Функция для отключения защиты
 void DisableProtection() {
-//     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, GPIO_PIN_RESET); //отключение защиты
-       MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-
+    MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
 }
 
 // Включение драйвера
@@ -420,29 +416,25 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     driver->Protection_Start_Time = currentTime + 250;
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
-//    driver->Enable_Attempts++;
+    driver->State = 1; // Устанавливаем состояние драйвера в активное
 }
 
 // Отключение драйвера
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-            MODULE_BZK_TX.bl_X5_3_OUT = 0;
             MODULE_BZK_TX.bl_X5_4_OUT = 1;
             MODULE_BZK_TX.bl_X5_11_IN = 0;
             break;
         case 1:
-            MODULE_BZK_TX.bl_X5_5_OUT = 0;
             MODULE_BZK_TX.bl_X5_6_OUT = 1;
             MODULE_BZK_TX.bl_X5_12_IN = 0;
             break;
         case 2:
-            MODULE_BZK_TX.bl_X5_7_OUT = 0;
             MODULE_BZK_TX.bl_X5_8_OUT = 1;
             MODULE_BZK_TX.bl_X5_13_IN = 0;
             break;
         case 3:
-            MODULE_BZK_TX.bl_X5_9_OUT = 0;
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
             MODULE_BZK_TX.bl_X5_14_IN = 0;
             break;
@@ -451,7 +443,7 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
     driver->Disable_Start_Time = currentTime + 1000;
-//    driver->Disable_Attempts++;
+    driver->State = 0; // Устанавливаем состояние драйвера в неактивное
 }
 
 // Сброс сигнала включения драйвера
@@ -504,24 +496,23 @@ bool AnyDriverActive() {
 void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0) {
+            EnableProtection(); // Включаем защиту перед включением драйвера
             EnableDriver(&Drivers[i], currentTime, i);
+        }
+
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+            ResetEnablingDriver(&Drivers[i], i);
+            Drivers[i].Reset_Enable_Driver_Time = 0;
+            HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+        }
+
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time) {
             EnableProtection();
         }
 
-        if (Drivers[i].State == 1) {
-            if (currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-                ResetEnablingDriver(&Drivers[i], i);
-                Drivers[i].Reset_Enable_Driver_Time = 0;
-                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
-            }
-
-            if (currentTime >= Drivers[i].Protection_Start_Time) {
-                EnableProtection();
-            }
-            if (currentTime >= Drivers[i].Protection_Disable_Time) {
-                DisableProtection();
-                Drivers[i].Protection_Disable_Time = 0;
-            }
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time) {
+            DisableProtection();
+            Drivers[i].Protection_Disable_Time = 0;
         }
     }
 }
@@ -534,7 +525,7 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                 Drivers[i].Disable_Start_Time = currentTime + 1000;
                 Drivers[i].Protection_Start_Time = currentTime + 250;
                 Drivers[i].Protection_Disable_Time = currentTime + 750;
-                EnableProtection();
+                EnableProtection(); // Включаем защиту при начале отключения драйвера
             } else {
                 if (currentTime >= Drivers[i].Protection_Start_Time) {
                     EnableProtection();
