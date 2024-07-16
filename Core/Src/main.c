@@ -495,8 +495,6 @@ bool AnyDriverActive() {
 void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1) {
-            EnableProtection(); // Включаем защиту перед включением драйвера
-            Drivers[i].Protection_Was_Enabled = 1;
             EnableDriver(&Drivers[i], currentTime, i);
         }
 
@@ -509,7 +507,6 @@ void ProcessDriverEnabling(uint32_t currentTime) {
         if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
             EnableProtection();
             Drivers[i].Protection_Was_Enabled = 1;
-
         }
 
         if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
@@ -528,35 +525,30 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                 Drivers[i].Disable_Start_Time = currentTime + 1000;
                 Drivers[i].Protection_Start_Time = currentTime + 250;
                 Drivers[i].Protection_Disable_Time = currentTime + 750;
-                EnableProtection(); // Включаем защиту при начале отключения драйвера
-                Drivers[i].Protection_Was_Enabled = 0;
             } else {
                 if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 0) {
                     EnableProtection();
                     Drivers[i].Protection_Was_Enabled = 0;
                 }
                 if (currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 0) {
-//                    if (!AnyDriverActive()) {
                         DisableProtection();
                         Drivers[i].Protection_Was_Disabled = 0;
-//                    }
-
-                    Drivers[i].Protection_Disable_Time = 0;
+                        Drivers[i].Protection_Disable_Time = 0;
                 }
                 if (currentTime >= Drivers[i].Disable_Start_Time) {
-//                    if (Drivers[i].Disable_Attempts < 3) {
                         DisableDriver(&Drivers[i], currentTime, i);
                         HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-//                    }
                 }
             }
-        } else if (Drivers[i].State == 0 && Drivers[i].Disable_Start_Time != 0) {
+        } else {
+          if (Drivers[i].State == 0 && Drivers[i].Disable_Start_Time != 0) {
             if (currentTime >= Drivers[i].Disable_Start_Time + 100) {
                 ResetDisablingDriver(&Drivers[i], i);
                 Drivers[i].Disable_Start_Time = 0;
                 Drivers[i].Disable_Attempts = 0;
             }
-        }
+          }
+       }
     }
 }
 
