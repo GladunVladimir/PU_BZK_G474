@@ -117,7 +117,6 @@ typedef struct
   uint32_t Protection_Start_Time;
   uint32_t Protection_Disable_Time;
   uint32_t Disable_Start_Time;
-//  uint32_t Signal_Reset_Time; // Время для сброса сигнала
   uint32_t Reset_Enable_Driver_Time;
   uint8_t Enable_Attempts;
   uint8_t Disable_Attempts;
@@ -418,7 +417,6 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     driver->Protection_Start_Time = currentTime + 250;
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
-    driver->State = 1; // Устанавливаем состояние драйвера в активное
 }
 
 // Отключение драйвера
@@ -445,7 +443,6 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
     driver->Disable_Start_Time = currentTime + 1000;
-    driver->State = 0; // Устанавливаем состояние драйвера в неактивное
 }
 
 // Сброс сигнала включения драйвера
@@ -568,13 +565,6 @@ void ProcessDrivers(uint32_t currentTime) {
     UpdateDriverStates();
     ProcessDriverEnabling(currentTime);
     ProcessDriverDisabling(currentTime);
-
-//    static bool wasAnyDriverActive = false;
-//    bool isAnyDriverActive = AnyDriverActive();
-//    if (!isAnyDriverActive && wasAnyDriverActive) {
-//        DisableProtection();
-//    }
-//    wasAnyDriverActive = isAnyDriverActive;
 }
 
 
