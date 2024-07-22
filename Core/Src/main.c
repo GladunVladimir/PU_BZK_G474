@@ -157,6 +157,11 @@ void Main_Init(void)
   // Формируем строку серийного номера микроконтроллера
   GET_SERIAL_NUM();
 
+  MODULE_BZK_TX.bl_X5_4_OUT = 1;
+  MODULE_BZK_TX.bl_X5_6_OUT = 1;
+  MODULE_BZK_TX.bl_X5_8_OUT = 1;
+  MODULE_BZK_TX.bl_X5_10_OUT = 1;
+
   // Настройка фильтров CAN на приём соответствующих сообщений
   HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_FILTER_REMOTE);
 
@@ -166,6 +171,7 @@ void Main_Init(void)
   FDCANFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
   FDCANFilterConfig.FilterID1 = FDCAN_FILTER_FIRST_ID_Z_0;
   FDCANFilterConfig.FilterID2 = FDCAN_FILTER_SECOND_ID_Z_0;
+
   if (HAL_FDCAN_ConfigFilter(&hfdcan1, &FDCANFilterConfig) != HAL_OK)
   {
     Error_Handler();
@@ -497,17 +503,14 @@ bool AnyDriverActive() {
 
 
 void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
-  test = 1;
+  test = 99;
     while (Drivers[currentDriverIndex].Enable_Attempts < 3) {
           if (bl_Output_Value[currentDriverIndex] != 0x00 && Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Protection_Was_Enabled != 1) {
                EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
           }
 
-          if (Drivers[currentDriverIndex].State == 1 && currentTime >= Drivers[currentDriverIndex].Reset_Enable_Driver_Time) {
-              ResetEnablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
-              Drivers[currentDriverIndex].Reset_Enable_Driver_Time = 0;
-          }
+
 
           if (Drivers[currentDriverIndex].State == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Start_Time && Drivers[currentDriverIndex].Protection_Was_Enabled != 1) {
               EnableProtection();
@@ -518,6 +521,12 @@ void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t curre
               DisableProtection();
               Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
               Drivers[currentDriverIndex].Protection_Disable_Time = 0;
+          }
+
+
+          if (Drivers[currentDriverIndex].State == 1 && currentTime >= Drivers[currentDriverIndex].Reset_Enable_Driver_Time) {
+              ResetEnablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
+              Drivers[currentDriverIndex].Reset_Enable_Driver_Time = 0;
           }
           Drivers[currentDriverIndex].Enable_Attempts++;
     }
@@ -531,6 +540,7 @@ void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t curre
 
 // Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
+  test = 10;
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1) {
              EnableDriver(&Drivers[i], currentTime, i);
@@ -551,8 +561,11 @@ void ProcessDriverEnabling(uint32_t currentTime) {
         if (Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
             ResetEnablingDriver(&Drivers[i], i);
             Drivers[i].Reset_Enable_Driver_Time = 0;
-
         }
+
+//        if (Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+//            EnablingAttemptMaking(&Drivers[i], currentTime, i);
+//        }
     }
 }
 
