@@ -111,7 +111,15 @@ static bool_t bl_TIMER_CAN;
 static bool_t bl_Warning_LED, bl_BusOff_LED;
 
 
-static int test;
+static bool_t Waiting_Process_Driver_Enabling;
+static bool_t Waiting_Process_Driver_Disabling;
+
+static uint8_t Disabling_After_Power_Supply;
+static uint32_t Disabling_After_Power_Supply_Time;
+static uint32_t After_Power_Supply_Protection_Enabling_Time;
+static uint32_t After_Power_Supply_Protection_Disabling_Time;
+
+
 
 
 typedef struct
@@ -131,6 +139,8 @@ typedef struct
   bool_t State;
   bool_t Protection_Was_Enabled;
   bool_t Protection_Was_Disabled;
+  bool_t In_Process_Enabling;
+  bool_t In_Process_Disabling;
 }DRIVER_t;
 
 
@@ -157,10 +167,8 @@ void Main_Init(void)
   // Формируем строку серийного номера микроконтроллера
   GET_SERIAL_NUM();
 
-  MODULE_BZK_TX.bl_X5_4_OUT = 1;
-  MODULE_BZK_TX.bl_X5_6_OUT = 1;
-  MODULE_BZK_TX.bl_X5_8_OUT = 1;
-  MODULE_BZK_TX.bl_X5_10_OUT = 1;
+
+
 
   // Настройка фильтров CAN на приём соответствующих сообщений
   HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_REJECT, FDCAN_REJECT, FDCAN_REJECT_REMOTE, FDCAN_FILTER_REMOTE);
@@ -431,6 +439,7 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     driver->Protection_Start_Time = currentTime + 250;
     driver->Protection_Disable_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
+    driver->In_Process_Enabling = 1;
 }
 
 // Отключение драйвера
@@ -453,6 +462,7 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
             MODULE_BZK_TX.bl_X5_14_IN = 0;
             break;
     }
+    driver->In_Process_Disabling = 1;
 }
 
 // Сброс сигнала включения драйвера
@@ -471,6 +481,7 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
             MODULE_BZK_TX.bl_X5_10_OUT = 0;
             break;
     }
+    driver->In_Process_Disabling = 0;
 }
 
 // Сброс сигнала отключения драйвера
@@ -489,12 +500,13 @@ void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
             MODULE_BZK_TX.bl_X5_9_OUT = 0;
             break;
     }
+    driver->In_Process_Enabling = 0;
 }
 
 // Проверка состояния активности одного из драйверов
-bool AnyDriverActive() {
+bool AnyDriverInProcess() {
     for (int i = 0; i < 4; i++) {
-        if (Drivers[i].State == 1) {
+        if (Drivers[i].In_Process_Enabling == 1 || Drivers[i].In_Process_Disabling == 1) {
             return true;
         }
     }
@@ -502,15 +514,22 @@ bool AnyDriverActive() {
 }
 
 
+// Проверка состояния активности одного из драйверов
+bool AnyDriverEnabled() {
+    for (int i = 0; i < 4; i++) {
+        if (Drivers[i].State == 1) {
+          return true;
+        }
+    }
+    return false;
+}
+
+
 void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
-  test = 99;
     while (Drivers[currentDriverIndex].Enable_Attempts < 3) {
           if (bl_Output_Value[currentDriverIndex] != 0x00 && Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Protection_Was_Enabled != 1) {
                EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
-               HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
           }
-
-
 
           if (Drivers[currentDriverIndex].State == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Start_Time && Drivers[currentDriverIndex].Protection_Was_Enabled != 1) {
               EnableProtection();
@@ -540,44 +559,50 @@ void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t curre
 
 // Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
-  test = 10;
     for (int i = 0; i < 4; i++) {
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1) {
-             EnableDriver(&Drivers[i], currentTime, i);
-             HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+        if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0) {
+          if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].In_Process_Enabling == 0) {
+               EnableDriver(&Drivers[i], currentTime, i);
+               Waiting_Process_Driver_Enabling = 1;
+          }
         }
 
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
-              EnableProtection();
-              Drivers[i].Protection_Was_Enabled = 1;
+          if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
+                EnableProtection();
+                Drivers[i].Protection_Was_Enabled = 1;
+          }
+
+          if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
+               DisableProtection();
+               Drivers[i].Protection_Was_Disabled = 1;
+               Drivers[i].Protection_Disable_Time = 0;
+          }
+
+          if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+              ResetEnablingDriver(&Drivers[i], i);
+              Drivers[i].Reset_Enable_Driver_Time = 0;
+              Waiting_Process_Driver_Enabling = 0;
+          }
         }
 
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
-             DisableProtection();
-             Drivers[i].Protection_Was_Disabled = 1;
-             Drivers[i].Protection_Disable_Time = 0;
-        }
-
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-            ResetEnablingDriver(&Drivers[i], i);
-            Drivers[i].Reset_Enable_Driver_Time = 0;
-        }
-
-//        if (Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-//            EnablingAttemptMaking(&Drivers[i], currentTime, i);
-//        }
-    }
 }
 
 // Обработка отключения драйверов
 void ProcessDriverDisabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1) {
+          if (!AnyDriverInProcess() && Waiting_Process_Driver_Disabling == 0) {
                 if (Drivers[i].Disable_Start_Time == 0) {
                     Drivers[i].Disable_Start_Time = currentTime + 1000;
                     Drivers[i].Protection_Start_Time = currentTime + 250;
                     Drivers[i].Protection_Disable_Time = currentTime + 750;
                 }
+
+                if (currentTime >= Drivers[i].Disable_Start_Time) {
+                    DisableDriver(&Drivers[i], currentTime, i);
+                }
+          }
+
                 if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 0) {
                     EnableProtection();
                     Drivers[i].Protection_Was_Enabled = 0;
@@ -587,10 +612,8 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                     Drivers[i].Protection_Was_Disabled = 0;
                     Drivers[i].Protection_Disable_Time = 0;
                 }
-                if (currentTime >= Drivers[i].Disable_Start_Time) {
-                    DisableDriver(&Drivers[i], currentTime, i);
-                    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-                }
+
+
          }
 
               if (Drivers[i].State == 0 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
@@ -602,8 +625,16 @@ void ProcessDriverDisabling(uint32_t currentTime) {
 }
 
 
+
+
 // Основная функция обработки драйверов
 void ProcessDrivers(uint32_t currentTime) {
+    if (AnyDriverEnabled()) {
+      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+    } else {
+      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+    }
+
     UpdateDriverStates();
     ProcessDriverEnabling(currentTime);
     ProcessDriverDisabling(currentTime);
@@ -649,6 +680,7 @@ int main(void)
   // Начальная настройка
   Main_Init();
   uint32_t currentTime = HAL_GetTick();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -656,12 +688,9 @@ int main(void)
   // Флаг окончания начальной настройки
   bl_Init_End = TRUE;
 
+  Disabling_After_Power_Supply = 0;
   HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-
-
-
-
 
 
   // Фоновый цикл
@@ -673,6 +702,40 @@ int main(void)
     // Сброс сторожевого таймера
     HAL_IWDG_Refresh(&hiwdg);
 #endif
+
+    if (Disabling_After_Power_Supply == 0) {
+        MODULE_BZK_TX.bl_X5_4_OUT = 1;
+        MODULE_BZK_TX.bl_X5_6_OUT = 1;
+        MODULE_BZK_TX.bl_X5_8_OUT = 1;
+        MODULE_BZK_TX.bl_X5_10_OUT = 1;
+
+        Disabling_After_Power_Supply_Time = currentTime + 1000;
+        After_Power_Supply_Protection_Enabling_Time = currentTime + 250;
+        After_Power_Supply_Protection_Disabling_Time = currentTime + 750;
+        Disabling_After_Power_Supply = 1;
+    }
+
+
+    if (Disabling_After_Power_Supply == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time) {
+        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+    }
+
+    if (Disabling_After_Power_Supply == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time) {
+        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+    }
+
+    if (Disabling_After_Power_Supply == 1 && currentTime >= Disabling_After_Power_Supply_Time) {
+        MODULE_BZK_TX.bl_X5_4_OUT = 0;
+        MODULE_BZK_TX.bl_X5_6_OUT = 0;
+        MODULE_BZK_TX.bl_X5_8_OUT = 0;
+        MODULE_BZK_TX.bl_X5_10_OUT = 0;
+
+        Disabling_After_Power_Supply = 2;
+        Disabling_After_Power_Supply_Time = 0;
+    }
+
+
+
 
 
 
