@@ -503,7 +503,7 @@ void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     driver->In_Process_Enabling = 0;
 }
 
-// Проверка состояния активности одного из драйверов
+// Проверка наличия хотя бы одного драйвера в состоянии переключения
 bool AnyDriverInProcess() {
     for (int i = 0; i < 4; i++) {
         if (Drivers[i].In_Process_Enabling == 1 || Drivers[i].In_Process_Disabling == 1) {
@@ -514,7 +514,7 @@ bool AnyDriverInProcess() {
 }
 
 
-// Проверка состояния активности одного из драйверов
+// Проверка наличия хотя бы одного включенного драйвера
 bool AnyDriverEnabled() {
     for (int i = 0; i < 4; i++) {
         if (Drivers[i].State == 1) {
@@ -560,7 +560,7 @@ void EnablingAttemptMaking(DRIVER_t* driver, uint32_t currentTime, uint8_t curre
 // Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
-        if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0) {
+        if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0 && Waiting_Process_Driver_Disabling == 0) {
           if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].In_Process_Enabling == 0) {
                EnableDriver(&Drivers[i], currentTime, i);
                Waiting_Process_Driver_Enabling = 1;
@@ -591,7 +591,7 @@ void ProcessDriverEnabling(uint32_t currentTime) {
 void ProcessDriverDisabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
         if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1) {
-          if (!AnyDriverInProcess() && Waiting_Process_Driver_Disabling == 0) {
+          if (!AnyDriverInProcess() && Waiting_Process_Driver_Disabling == 0 && Waiting_Process_Driver_Enabling == 0) {
                 if (Drivers[i].Disable_Start_Time == 0) {
                     Drivers[i].Disable_Start_Time = currentTime + 1000;
                     Drivers[i].Protection_Start_Time = currentTime + 250;
@@ -607,6 +607,7 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                     EnableProtection();
                     Drivers[i].Protection_Was_Enabled = 0;
                 }
+
                 if (currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 0) {
                     DisableProtection();
                     Drivers[i].Protection_Was_Disabled = 0;
@@ -696,12 +697,11 @@ int main(void)
   // Фоновый цикл
   while (1)
   {
-
     currentTime = HAL_GetTick();
-#ifdef HAL_IWDG_MODULE_ENABLED
-    // Сброс сторожевого таймера
-    HAL_IWDG_Refresh(&hiwdg);
-#endif
+    #ifdef HAL_IWDG_MODULE_ENABLED
+        // Сброс сторожевого таймера
+        HAL_IWDG_Refresh(&hiwdg);
+    #endif
 
     if (Disabling_After_Power_Supply == 0) {
         MODULE_BZK_TX.bl_X5_4_OUT = 1;
@@ -733,10 +733,6 @@ int main(void)
         Disabling_After_Power_Supply = 2;
         Disabling_After_Power_Supply_Time = 0;
     }
-
-
-
-
 
 
     // Сигнал для начального включения светодиодов
