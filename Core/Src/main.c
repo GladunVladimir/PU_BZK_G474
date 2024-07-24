@@ -119,7 +119,8 @@ static uint32_t Disabling_After_Power_Supply_Time;
 static uint32_t After_Power_Supply_Protection_Enabling_Time;
 static uint32_t After_Power_Supply_Protection_Disabling_Time;
 
-
+static int test;
+static int testtest;
 
 
 typedef struct
@@ -533,29 +534,29 @@ void ProcessDriverEnabling(uint32_t currentTime) {
               EnableDriver(&Drivers[i], currentTime, i);
               Waiting_Process_Driver_Enabling = 1;
               Drivers[i].Enable_Attempts++;
-          }
-        } else {
-          if (Waiting_Process_Driver_Disabling == 1){
-              break;
+              test = 1;
           }
         }
 
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
             EnableProtection();
             Drivers[i].Protection_Was_Enabled = 1;
+            test = 2;
         }
 
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
             DisableProtection();
             Drivers[i].Protection_Was_Disabled = 1;
             Drivers[i].Protection_Disable_Time = 0;
+            test = 3;
         }
 
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+        if ( Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
             ResetEnablingDriver(&Drivers[i], i);
             Drivers[i].Reset_Enable_Driver_Time = 0;
             Waiting_Process_Driver_Enabling = 0;
             Drivers[i].Enable_Attempts = 0;
+            test = 4;
         }
 
     }
@@ -575,11 +576,6 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                 if (currentTime >= Drivers[i].Disable_Start_Time) {
                     DisableDriver(&Drivers[i], currentTime, i);
                 }
-          } else {
-            if (Waiting_Process_Driver_Enabling == 1) {
-              break;
-            }
-
           }
 
 
