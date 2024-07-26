@@ -109,6 +109,9 @@ static TIMER_t TIMER_CAN_Data;
 static bool_t bl_TIMER_CAN;
 static uint8_t ui8_Index_LED;
 
+uint32_t lastMsgTime = 0;
+const uint32_t timeout = 1000; // 100 миллисекунд таймаута
+
 static bool_t bl_Warning_LED, bl_BusOff_LED;
 
 
@@ -286,8 +289,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         ui32_CAN_ErrorCode[i16_TEMP] = (ui32_CAN_ErrorCode[i16_TEMP] | 0x80000000U);
       }
     }
-  }
 
+  }
+  lastMsgTime = HAL_GetTick();
   HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, FDCAN_TX_BUFFER0);
 }
 
@@ -548,17 +552,6 @@ bool AnyDriverEnabled() {
 // Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
-
-//      /////
-//
-//      if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-//        ResetEnablingDriver(&Drivers[i], i);
-//      }
-//
-//      ////
-
-
-
         if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0 && Waiting_Process_Driver_Disabling == 0 && Drivers[i].Enable_Attempts < 3) {
           if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].In_Process_Enabling == 0) {
               EnableDriver(&Drivers[i], currentTime, i);
@@ -591,16 +584,6 @@ void ProcessDriverEnabling(uint32_t currentTime) {
 // Обработка отключения драйверов
 void ProcessDriverDisabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
-
-
-//      ///////
-//
-//      if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
-//        ResetDisablingDriver(&Drivers[i], i);
-//      }
-//
-//      //////
-
         if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1) {
           if (!AnyDriverInProcess() && Waiting_Process_Driver_Disabling == 0 && Waiting_Process_Driver_Enabling == 0) {
                 if (Drivers[i].Disable_Start_Time == 0) {
@@ -706,10 +689,6 @@ int main(void)
   Disabling_After_Power_Supply_1 = 0;
   Disabling_After_Power_Supply_2 = 0;
   Disabling_After_Power_Supply_3 = 0;
-
-
-
-
 
   // Фоновый цикл
   while (1)
@@ -881,7 +860,7 @@ int main(void)
     }
 
 
-    // Задаём состояние дискретных выходов
+//    // Задаём состояние дискретных выходов
     HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);
     HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[6U]);
     HAL_GPIO_WritePin(OUT_D_3_GPIO_Port, OUT_D_3_Pin, bl_Output_Value[7U]);
@@ -894,6 +873,8 @@ int main(void)
     HAL_GPIO_WritePin(OUT_D_10_GPIO_Port, OUT_D_10_Pin, bl_Output_Value[13U]);
     HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[14U]);
     HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]);
+
+
 
 
 
@@ -1005,9 +986,14 @@ int main(void)
                  MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
 
 
-
-
-
+                 if (currentTime - lastMsgTime > timeout)
+                     {
+                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                     }
+                     else
+                     {
+                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                     }
 
 
                  if (bl_TIMER_LED)
@@ -1016,15 +1002,12 @@ int main(void)
                       {
                         case 0:
                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
                           break;
                         case 1:
                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
                           break;
                         default:
                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
                           break;
                       }
 
