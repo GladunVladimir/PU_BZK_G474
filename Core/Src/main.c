@@ -118,25 +118,6 @@ static bool_t bl_Warning_LED, bl_BusOff_LED;
 static bool_t Waiting_Process_Driver_Enabling;
 static bool_t Waiting_Process_Driver_Disabling;
 
-static uint8_t Disabling_After_Power_Supply_0;
-static uint8_t Disabling_After_Power_Supply_1;
-static uint8_t Disabling_After_Power_Supply_2;
-static uint8_t Disabling_After_Power_Supply_3;
-static uint32_t Disabling_After_Power_Supply_Time_0;
-static uint32_t Disabling_After_Power_Supply_Time_1;
-static uint32_t Disabling_After_Power_Supply_Time_2;
-static uint32_t Disabling_After_Power_Supply_Time_3;
-static uint32_t After_Power_Supply_Protection_Enabling_Time_0;
-static uint32_t After_Power_Supply_Protection_Enabling_Time_1;
-static uint32_t After_Power_Supply_Protection_Enabling_Time_2;
-static uint32_t After_Power_Supply_Protection_Enabling_Time_3;
-static uint32_t After_Power_Supply_Protection_Disabling_Time_0;
-static uint32_t After_Power_Supply_Protection_Disabling_Time_1;
-static uint32_t After_Power_Supply_Protection_Disabling_Time_2;
-static uint32_t After_Power_Supply_Protection_Disabling_Time_3;
-
-
-
 
 typedef struct
 {
@@ -651,11 +632,10 @@ void ProcessDrivers(uint32_t currentTime) {
     } else {
       HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, 1);
     }
-//    if (Disabling_After_Power_Supply_0 == 2 && Disabling_After_Power_Supply_1 == 2 && Disabling_After_Power_Supply_2 == 2 && Disabling_After_Power_Supply_3 ==2) {
+
     UpdateDriverStates();
     ProcessDriverEnabling(currentTime);
     ProcessDriverDisabling(currentTime);
-//    }
 }
 
 
@@ -706,14 +686,6 @@ int main(void)
   // Флаг окончания начальной настройки
   bl_Init_End = TRUE;
 
-  Disabling_After_Power_Supply_0 = 0;
-  Disabling_After_Power_Supply_1 = 0;
-  Disabling_After_Power_Supply_2 = 0;
-  Disabling_After_Power_Supply_3 = 0;
-
-
-
-
   // Фоновый цикл
   while (1)
   {
@@ -723,107 +695,6 @@ int main(void)
         // Сброс сторожевого таймера
         HAL_IWDG_Refresh(&hiwdg);
     #endif
-
-
-        if (Disabling_After_Power_Supply_0 == 0) {
-              MODULE_BZK_TX.bl_X5_4_OUT = 1;
-
-
-              Disabling_After_Power_Supply_Time_0 = currentTime + 1000;
-              After_Power_Supply_Protection_Enabling_Time_0 = currentTime + 250;
-              After_Power_Supply_Protection_Disabling_Time_0 = currentTime + 750;
-              Disabling_After_Power_Supply_0 = 1;
-          }
-
-          if (Disabling_After_Power_Supply_1 == 0) {
-              MODULE_BZK_TX.bl_X5_6_OUT = 1;
-
-              Disabling_After_Power_Supply_Time_1 = currentTime + 2000;
-              After_Power_Supply_Protection_Enabling_Time_1 = currentTime + 1250;
-              After_Power_Supply_Protection_Disabling_Time_1 = currentTime + 1750;
-              Disabling_After_Power_Supply_1 = 1;
-          }
-
-          if (Disabling_After_Power_Supply_2 == 0) {
-              MODULE_BZK_TX.bl_X5_8_OUT = 1;
-
-              Disabling_After_Power_Supply_Time_2 = currentTime + 3000;
-              After_Power_Supply_Protection_Enabling_Time_2 = currentTime + 2250;
-              After_Power_Supply_Protection_Disabling_Time_2 = currentTime + 2750;
-              Disabling_After_Power_Supply_2 = 1;
-          }
-
-          if (Disabling_After_Power_Supply_3 == 0) {
-              MODULE_BZK_TX.bl_X5_10_OUT = 1;
-
-              Disabling_After_Power_Supply_Time_3 = currentTime + 4000;
-              After_Power_Supply_Protection_Enabling_Time_3 = currentTime + 3250;
-              After_Power_Supply_Protection_Disabling_Time_3 = currentTime + 3750;
-              Disabling_After_Power_Supply_3 = 1;
-          }
-
-
-
-          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_0) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-          }
-
-          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_0) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-          }
-
-          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_1) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-          }
-
-          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_1) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-          }
-
-          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_2) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-          }
-
-          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_2) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-          }
-
-          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_3) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-          }
-
-          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_3) {
-              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-          }
-
-          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= Disabling_After_Power_Supply_Time_0) {
-              MODULE_BZK_TX.bl_X5_4_OUT = 0;
-
-              Disabling_After_Power_Supply_0 = 2;
-              Disabling_After_Power_Supply_Time_0 = 0;
-          }
-
-          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= Disabling_After_Power_Supply_Time_1) {
-              MODULE_BZK_TX.bl_X5_6_OUT = 0;
-
-              Disabling_After_Power_Supply_1 = 2;
-              Disabling_After_Power_Supply_Time_1 = 0;
-          }
-
-          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= Disabling_After_Power_Supply_Time_2) {
-              MODULE_BZK_TX.bl_X5_8_OUT = 0;
-
-              Disabling_After_Power_Supply_2 = 2;
-              Disabling_After_Power_Supply_Time_2 = 0;
-          }
-
-          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= Disabling_After_Power_Supply_Time_3) {
-              MODULE_BZK_TX.bl_X5_10_OUT = 0;
-
-              Disabling_After_Power_Supply_3 = 2;
-              Disabling_After_Power_Supply_Time_3 = 0;
-          }
-
 
     // Сигнал для начального включения светодиодов
     bl_TP_Init_End = TP(bl_Init_End, 1000UL, &TP_Init_End_DATA);
