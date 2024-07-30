@@ -157,6 +157,7 @@ typedef struct
   bool_t Protection_Was_Disabled;
   bool_t In_Process_Enabling;
   bool_t In_Process_Disabling;
+  bool_t Faulty_Driver;
 }DRIVER_t;
 
 
@@ -549,7 +550,6 @@ bool AnyDriverEnabled() {
 }
 
 
-// Обработка включения драйверов
 void ProcessDriverEnabling(uint32_t currentTime) {
     for (int i = 0; i < 4; i++) {
         if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0 && Waiting_Process_Driver_Disabling == 0 && Drivers[i].Enable_Attempts < 3) {
@@ -571,15 +571,26 @@ void ProcessDriverEnabling(uint32_t currentTime) {
             Drivers[i].Protection_Disable_Time = 0;
         }
 
-        if ( Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
             ResetEnablingDriver(&Drivers[i], i);
             Drivers[i].Reset_Enable_Driver_Time = 0;
             Waiting_Process_Driver_Enabling = 0;
             Drivers[i].Enable_Attempts = 0;
         }
 
+        if (Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
+            ResetEnablingDriver(&Drivers[i], i);
+            Drivers[i].Reset_Enable_Driver_Time = 0;
+            Drivers[i].Faulty_Driver = 1;
+            Waiting_Process_Driver_Enabling = 0;
+//            AttemptsEnabling(&Drivers[i], currentTime , i);
+
+        }
     }
 }
+
+
+
 
 // Обработка отключения драйверов
 void ProcessDriverDisabling(uint32_t currentTime) {
@@ -590,6 +601,8 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                     Drivers[i].Disable_Start_Time = currentTime + 1000;
                     Drivers[i].Protection_Start_Time = currentTime + 250;
                     Drivers[i].Protection_Disable_Time = currentTime + 750;
+                    Waiting_Process_Driver_Disabling = 1;
+
                 }
 
                 if (currentTime >= Drivers[i].Disable_Start_Time) {
@@ -608,17 +621,25 @@ void ProcessDriverDisabling(uint32_t currentTime) {
                     Drivers[i].Protection_Was_Disabled = 0;
                     Drivers[i].Protection_Disable_Time = 0;
                 }
-
-
          }
 
               if (Drivers[i].State == 0 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
                     ResetDisablingDriver(&Drivers[i], i);
                     Drivers[i].Disable_Start_Time = 0;
                     Drivers[i].Disable_Attempts = 0;
+                    Waiting_Process_Driver_Disabling = 0;
              }
+
+              if (Drivers[i].State == 1 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
+                  ResetDisablingDriver(&Drivers[i], i);
+                  Drivers[i].Disable_Start_Time = 0;
+                  Drivers[i].Disable_Attempts = 0;
+                  Drivers[i].Faulty_Driver = 1;
+                  Waiting_Process_Driver_Disabling = 0;
+              }
      }
 }
+
 
 
 
@@ -630,11 +651,11 @@ void ProcessDrivers(uint32_t currentTime) {
     } else {
       HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, 1);
     }
-    if (Disabling_After_Power_Supply_0 == 2 && Disabling_After_Power_Supply_1 == 2 && Disabling_After_Power_Supply_2 == 2 && Disabling_After_Power_Supply_3 ==2) {
+//    if (Disabling_After_Power_Supply_0 == 2 && Disabling_After_Power_Supply_1 == 2 && Disabling_After_Power_Supply_2 == 2 && Disabling_After_Power_Supply_3 ==2) {
     UpdateDriverStates();
     ProcessDriverEnabling(currentTime);
     ProcessDriverDisabling(currentTime);
-    }
+//    }
 }
 
 
@@ -690,6 +711,9 @@ int main(void)
   Disabling_After_Power_Supply_2 = 0;
   Disabling_After_Power_Supply_3 = 0;
 
+
+
+
   // Фоновый цикл
   while (1)
   {
@@ -700,120 +724,105 @@ int main(void)
         HAL_IWDG_Refresh(&hiwdg);
     #endif
 
-    if (Disabling_After_Power_Supply_0 == 0) {
-        HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
-        MODULE_BZK_TX.bl_X5_4_OUT = 1;
+
+        if (Disabling_After_Power_Supply_0 == 0) {
+              MODULE_BZK_TX.bl_X5_4_OUT = 1;
 
 
-        Disabling_After_Power_Supply_Time_0 = currentTime + 1000;
-        After_Power_Supply_Protection_Enabling_Time_0 = currentTime + 250;
-        After_Power_Supply_Protection_Disabling_Time_0 = currentTime + 750;
-        Disabling_After_Power_Supply_0 = 1;
-    }
+              Disabling_After_Power_Supply_Time_0 = currentTime + 1000;
+              After_Power_Supply_Protection_Enabling_Time_0 = currentTime + 250;
+              After_Power_Supply_Protection_Disabling_Time_0 = currentTime + 750;
+              Disabling_After_Power_Supply_0 = 1;
+          }
 
-    if (Disabling_After_Power_Supply_1 == 0) {
-        HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
-        MODULE_BZK_TX.bl_X5_6_OUT = 1;
+          if (Disabling_After_Power_Supply_1 == 0) {
+              MODULE_BZK_TX.bl_X5_6_OUT = 1;
 
-        Disabling_After_Power_Supply_Time_1 = currentTime + 2000;
-        After_Power_Supply_Protection_Enabling_Time_1 = currentTime + 1250;
-        After_Power_Supply_Protection_Disabling_Time_1 = currentTime + 1750;
-        Disabling_After_Power_Supply_1 = 1;
-    }
+              Disabling_After_Power_Supply_Time_1 = currentTime + 2000;
+              After_Power_Supply_Protection_Enabling_Time_1 = currentTime + 1250;
+              After_Power_Supply_Protection_Disabling_Time_1 = currentTime + 1750;
+              Disabling_After_Power_Supply_1 = 1;
+          }
 
-    if (Disabling_After_Power_Supply_2 == 0) {
-        HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
-        MODULE_BZK_TX.bl_X5_8_OUT = 1;
+          if (Disabling_After_Power_Supply_2 == 0) {
+              MODULE_BZK_TX.bl_X5_8_OUT = 1;
 
-        Disabling_After_Power_Supply_Time_2 = currentTime + 3000;
-        After_Power_Supply_Protection_Enabling_Time_2 = currentTime + 2250;
-        After_Power_Supply_Protection_Disabling_Time_2 = currentTime + 2750;
-        Disabling_After_Power_Supply_2 = 1;
-    }
+              Disabling_After_Power_Supply_Time_2 = currentTime + 3000;
+              After_Power_Supply_Protection_Enabling_Time_2 = currentTime + 2250;
+              After_Power_Supply_Protection_Disabling_Time_2 = currentTime + 2750;
+              Disabling_After_Power_Supply_2 = 1;
+          }
 
-    if (Disabling_After_Power_Supply_3 == 0) {
-        HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
-        MODULE_BZK_TX.bl_X5_10_OUT = 1;
+          if (Disabling_After_Power_Supply_3 == 0) {
+              MODULE_BZK_TX.bl_X5_10_OUT = 1;
 
-        Disabling_After_Power_Supply_Time_3 = currentTime + 4000;
-        After_Power_Supply_Protection_Enabling_Time_3 = currentTime + 3250;
-        After_Power_Supply_Protection_Disabling_Time_3 = currentTime + 3750;
-        Disabling_After_Power_Supply_3 = 1;
-    }
+              Disabling_After_Power_Supply_Time_3 = currentTime + 4000;
+              After_Power_Supply_Protection_Enabling_Time_3 = currentTime + 3250;
+              After_Power_Supply_Protection_Disabling_Time_3 = currentTime + 3750;
+              Disabling_After_Power_Supply_3 = 1;
+          }
 
 
 
-    if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_0) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-    }
+          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_0) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+          }
 
-    if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_0) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-    }
+          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_0) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+          }
 
-    if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_1) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-    }
+          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_1) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+          }
 
-    if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_1) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-    }
+          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_1) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+          }
 
-    if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_2) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-    }
+          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_2) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+          }
 
-    if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_2) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-    }
+          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_2) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+          }
 
-    if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_3) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
-    }
+          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_3) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+          }
 
-    if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_3) {
-        HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-        MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
-    }
+          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_3) {
+              MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+          }
 
-    if (Disabling_After_Power_Supply_0 == 1 && currentTime >= Disabling_After_Power_Supply_Time_0) {
-        HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0);
-        MODULE_BZK_TX.bl_X5_4_OUT = 0;
+          if (Disabling_After_Power_Supply_0 == 1 && currentTime >= Disabling_After_Power_Supply_Time_0) {
+              MODULE_BZK_TX.bl_X5_4_OUT = 0;
 
-        Disabling_After_Power_Supply_0 = 2;
-        Disabling_After_Power_Supply_Time_0 = 0;
-    }
+              Disabling_After_Power_Supply_0 = 2;
+              Disabling_After_Power_Supply_Time_0 = 0;
+          }
 
-    if (Disabling_After_Power_Supply_1 == 1 && currentTime >= Disabling_After_Power_Supply_Time_1) {
-        HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0);
-        MODULE_BZK_TX.bl_X5_6_OUT = 0;
+          if (Disabling_After_Power_Supply_1 == 1 && currentTime >= Disabling_After_Power_Supply_Time_1) {
+              MODULE_BZK_TX.bl_X5_6_OUT = 0;
 
-        Disabling_After_Power_Supply_1 = 2;
-        Disabling_After_Power_Supply_Time_1 = 0;
-    }
+              Disabling_After_Power_Supply_1 = 2;
+              Disabling_After_Power_Supply_Time_1 = 0;
+          }
 
-    if (Disabling_After_Power_Supply_2 == 1 && currentTime >= Disabling_After_Power_Supply_Time_2) {
-        HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0);
-        MODULE_BZK_TX.bl_X5_8_OUT = 0;
+          if (Disabling_After_Power_Supply_2 == 1 && currentTime >= Disabling_After_Power_Supply_Time_2) {
+              MODULE_BZK_TX.bl_X5_8_OUT = 0;
 
-        Disabling_After_Power_Supply_2 = 2;
-        Disabling_After_Power_Supply_Time_2 = 0;
-    }
+              Disabling_After_Power_Supply_2 = 2;
+              Disabling_After_Power_Supply_Time_2 = 0;
+          }
 
-    if (Disabling_After_Power_Supply_3 == 1 && currentTime >= Disabling_After_Power_Supply_Time_3) {
-        HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0);
-        MODULE_BZK_TX.bl_X5_10_OUT = 0;
+          if (Disabling_After_Power_Supply_3 == 1 && currentTime >= Disabling_After_Power_Supply_Time_3) {
+              MODULE_BZK_TX.bl_X5_10_OUT = 0;
 
-        Disabling_After_Power_Supply_3 = 2;
-        Disabling_After_Power_Supply_Time_3 = 0;
-    }
+              Disabling_After_Power_Supply_3 = 2;
+              Disabling_After_Power_Supply_Time_3 = 0;
+          }
 
 
     // Сигнал для начального включения светодиодов
