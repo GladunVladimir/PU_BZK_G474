@@ -429,7 +429,7 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     switch (currentDriverIndex) {
         case 0:
             MODULE_BZK_TX.bl_X5_3_OUT = 1;
-//            MODULE_BZK_TX.bl_X5_11_IN = 1;
+            MODULE_BZK_TX.bl_X5_11_IN = 1;
             break;
         case 1:
             MODULE_BZK_TX.bl_X5_5_OUT = 1;
@@ -573,37 +573,37 @@ void ProcessDriverEnabling(uint32_t currentTime) {
 
 
 
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].Enable_Attempts < 3) {
-            EnableProtection();
-            Drivers[i].Protection_Was_Enabled = 1;
-            c_3++;
-        }
-
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1 && Drivers[i].Enable_Attempts < 3) {
-            DisableProtection();
-            Drivers[i].Protection_Was_Disabled = 1;
-            Drivers[i].Protection_Disable_Time = 0;
-            d_4++;
-        }
-
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time && Drivers[i].Enable_Attempts < 3) {
-            Drivers[i].Protection_Was_Enabled = 0;
-            Drivers[i].Protection_Was_Disabled = 0;
-            ResetEnablingDriver(&Drivers[i], i);
-            Drivers[i].Reset_Enable_Driver_Time = 0;
-            e_5++;
-            Drivers[i].In_Loop_Attempts = 1;
-        }
-
-        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time && Drivers[i].Enable_Attempts >= 3 && Drivers[i].Not_Opened_At_First_Attempt == 0) {
-            Drivers[i].Protection_Was_Enabled = 0;
-            Drivers[i].Protection_Was_Disabled = 0;
-            Drivers[i].Not_Opened_At_First_Attempt = 1;
-            ResetEnablingDriver(&Drivers[i], i);
-            Drivers[i].In_Process_Enabling = 0;
-            Waiting_Process_Driver_Enabling = 0;
-            f_6++;
-        }
+//        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].Enable_Attempts < 3) {
+//            EnableProtection();
+//            Drivers[i].Protection_Was_Enabled = 1;
+//            c_3++;
+//        }
+//
+//        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1 && Drivers[i].Enable_Attempts < 3) {
+//            DisableProtection();
+//            Drivers[i].Protection_Was_Disabled = 1;
+//            Drivers[i].Protection_Disable_Time = 0;
+//            d_4++;
+//        }
+//
+//        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time && Drivers[i].Enable_Attempts < 3) {
+//            Drivers[i].Protection_Was_Enabled = 0;
+//            Drivers[i].Protection_Was_Disabled = 0;
+//            ResetEnablingDriver(&Drivers[i], i);
+//            Drivers[i].Reset_Enable_Driver_Time = 0;
+//            e_5++;
+//            Drivers[i].In_Loop_Attempts = 1;
+//        }
+//
+//        if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time && Drivers[i].Enable_Attempts >= 3 && Drivers[i].Not_Opened_At_First_Attempt == 0) {
+//            Drivers[i].Protection_Was_Enabled = 0;
+//            Drivers[i].Protection_Was_Disabled = 0;
+//            Drivers[i].Not_Opened_At_First_Attempt = 1;
+//            ResetEnablingDriver(&Drivers[i], i);
+//            Drivers[i].In_Process_Enabling = 0;
+//            Waiting_Process_Driver_Enabling = 0;
+//            f_6++;
+//        }
 
     }
 }
@@ -898,14 +898,14 @@ int main(void)
                  }
 
 
-//                 if (currentTime - lastMsgTime > timeout)
-//                     {
-//                       bl_Operational_LED = false;
-//                     }
-//                     else
-//                     {
-//                       bl_Operational_LED = true;
-//                     }
+                 if (currentTime - lastMsgTime > timeout)
+                     {
+                       bl_Operational_LED = false;
+                     }
+                     else
+                     {
+                       bl_Operational_LED = true;
+                     }
 
 
 //                 if (bl_TIMER_LED)
