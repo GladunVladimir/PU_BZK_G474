@@ -109,6 +109,8 @@ static TIMER_t TIMER_CAN_Data;
 static bool_t bl_TIMER_CAN;
 static uint8_t ui8_Index_LED;
 
+static bool_t  bl_Warning_LED, bl_BusOff_LED, bl_PreoperationalMode_LED, bl_Operational_LED;
+
 uint32_t lastMsgTime = 0;
 const uint32_t timeout = 1000; // 100 миллисекунд таймаута
 
@@ -117,6 +119,9 @@ static bool_t bl_Warning_LED, bl_BusOff_LED;
 
 static bool_t Waiting_Process_Driver_Enabling;
 static bool_t Waiting_Process_Driver_Disabling;
+
+
+
 
 static int a_1, b_2, c_3, d_4, e_5, f_6, a_10, b_20, c_30, d_40, e_50, f_60;
 
@@ -198,6 +203,8 @@ void Main_Init(void)
   {
     Error_Handler();
   }
+
+  bl_PreoperationalMode_LED = true;
 }
 
 
@@ -868,33 +875,177 @@ int main(void)
                  MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
 
 
-                 if (currentTime - lastMsgTime > timeout)
+
+
+                 // Достигнут аварийный уровень ошибок в сети FDCAN
+                 if ((FDCAN_PSR_BO & READ_REG(hfdcan1.Instance->PSR)) != 0)
+                 {
+                     bl_BusOff_LED = TRUE;
+                 }
+                 else
+                 {
+                     bl_BusOff_LED = FALSE;
+
+                     // Достигнут предупредительный уровень ошибок в сети FDCAN
+                     if (((FDCAN_PSR_EW | FDCAN_PSR_EP) & READ_REG(hfdcan1.Instance->PSR)) != 0)
                      {
-                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         bl_Warning_LED = TRUE;
                      }
                      else
                      {
-                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         bl_Warning_LED = FALSE;
                      }
+                 }
+
+
+//                 if (currentTime - lastMsgTime > timeout)
+//                     {
+//                       bl_Operational_LED = false;
+//                     }
+//                     else
+//                     {
+//                       bl_Operational_LED = true;
+//                     }
+
+
+//                 if (bl_TIMER_LED)
+//                    {
+//                      switch (ui8_Index_LED)
+//                      {
+//                        case 0:
+//                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
+//                          break;
+//                        case 1:
+//                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
+//                          break;
+//                        default:
+//                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
+//                          break;
+//                      }
 
 
                  if (bl_TIMER_LED)
-                    {
-                      switch (ui8_Index_LED)
-                      {
-                        case 0:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
-                          break;
-                        case 1:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          break;
-                        default:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          break;
-                      }
+                   {
+                     switch (ui8_Index_LED)
+                     {
+                       case 0:
+                         if (bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         if (bl_Warning_LED || bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       case 1:
+                         if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         }
+                         if (bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       case 2:
+                         if (bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         }
+                         if (bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       case 3:
+                         if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         }
+                         if (bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       case 4:
+                         if (bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         }
+                         if (bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       case 5:
+                         if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         }
+                         if (bl_BusOff_LED || bl_TP_Init_End)
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                         }
+                         else
+                         {
+                           HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         }
+                         break;
+                       default:
+                         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                         HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                         break;
+                     }
+
+
 
                       ui8_Index_LED++;
-                      if (ui8_Index_LED > 2)
+                      if (ui8_Index_LED > 5)
                       {
                         ui8_Index_LED = 0;
                       }
