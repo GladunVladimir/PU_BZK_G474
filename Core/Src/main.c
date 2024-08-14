@@ -116,10 +116,8 @@ static bool_t bl_Warning_LED, bl_BusOff_LED;
 
 static int a_1, b_2, c_3, d_4, e_5, f_6, g_7, h_8, i_9, a_10, b_20, c_30, d_40, e_50, f_60, g_70, h_80, i_90;
 
-static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_4_enabling, step_1_disabling, step_2_disabling, step_3_disabling, step_4_disabling;
+static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_1_disabling, step_2_disabling, step_3_disabling;
 
-static bool_t Waiting_Process_Driver_Enabling;
-static bool_t Waiting_Process_Driver_Disabling;
 
 static bool_t  bl_Warning_LED, bl_BusOff_LED, bl_PreoperationalMode_LED, bl_Operational_LED;
 
@@ -970,23 +968,6 @@ int main(void)
                                     {
                                       bl_Operational_LED = true;
                                     }
-
-
-               //                 if (bl_TIMER_LED)
-               //                    {
-               //                      switch (ui8_Index_LED)
-               //                      {
-               //                        case 0:
-               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
-               //                          break;
-               //                        case 1:
-               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-               //                          break;
-               //                        default:
-               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-               //                          break;
-               //                      }
-
 
                                 if (bl_TIMER_LED)
                                   {
