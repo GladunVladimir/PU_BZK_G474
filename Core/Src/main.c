@@ -115,7 +115,7 @@ const uint32_t timeout = 1000; // 100 миллисекунд таймаута
 static bool_t bl_Warning_LED, bl_BusOff_LED;
 
 
-static int a_1, b_2, c_3, d_4, e_5, f_6, a_10, b_20, c_30, d_40, e_50, f_60, countT;
+static int a_1, b_2, c_3, d_4, e_5, f_6, g_7, h_8, i_9, a_10, b_20, c_30, d_40, e_50, f_60, g_70, h_80, i_90;
 
 static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_4_enabling, step_1_disabling, step_2_disabling, step_3_disabling, step_4_disabling;
 
@@ -565,13 +565,13 @@ void RecordDriverCommands() {
 void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
         if (bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts == 1) {
             currentDriverIndex = current_Driver_In_Loop;
-
         }
 
         if (!AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] != 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled != 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
             EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
             Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling = 1;
             Drivers[currentDriverIndex].In_Process_Enabling = 1;
+            Drivers[currentDriverIndex].Disable_Attempts = 0;
             step_1_enabling = 1;
             a_1++;
         }
@@ -609,6 +609,7 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
                   Drivers[currentDriverIndex].Enable_Attempts++;
                   current_Driver_In_Loop = currentDriverIndex;
                   In_Loop_Attempts = 1;
+                  e_5++;
               }
           }
       }
@@ -618,15 +619,15 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 // Обработка отключения драйверов
 void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 
+          if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts == 1) {
+              currentDriverIndex = current_Driver_In_Loop;
+          }
+
           if (bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Not_Opened_At_First_Attempt == 1) {
               Drivers[currentDriverIndex].Not_Opened_At_First_Attempt = 0;
               Drivers[currentDriverIndex].Enable_Attempts = 0;
               Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
               Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
-          }
-
-          if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts == 1) {
-              currentDriverIndex = current_Driver_In_Loop;
           }
 
           if (!AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
@@ -674,12 +675,10 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
                      Drivers[currentDriverIndex].Disable_Attempts++;
                      current_Driver_In_Loop = currentDriverIndex;
                      In_Loop_Attempts = 1;
+                     f_60++;
                  }
              }
-
-
-
- }
+}
 
 
 void ManageDrivers(uint32_t currentTime) {
