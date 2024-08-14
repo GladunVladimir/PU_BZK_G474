@@ -114,9 +114,14 @@ const uint32_t timeout = 1000; // 100 миллисекунд таймаута
 
 static bool_t bl_Warning_LED, bl_BusOff_LED;
 
+static int a_1, b_2, c_3, d_4, e_5, f_6, g_7, h_8, i_9, a_10, b_20, c_30, d_40, e_50, f_60, g_70, h_80, i_90;
+
+static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_4_enabling, step_1_disabling, step_2_disabling, step_3_disabling, step_4_disabling;
 
 static bool_t Waiting_Process_Driver_Enabling;
 static bool_t Waiting_Process_Driver_Disabling;
+
+static bool_t  bl_Warning_LED, bl_BusOff_LED, bl_PreoperationalMode_LED, bl_Operational_LED;
 
 
 typedef struct
@@ -126,18 +131,25 @@ typedef struct
   GPIO_TypeDef* GPIO_Port_Disable;
   uint16_t GPIO_Pin_Disable;
   uint32_t Start_Time;
-  uint32_t Protection_Start_Time;
-  uint32_t Protection_Disable_Time;
+  uint32_t Protection_Start_Enabling_Time;
+  uint32_t Protection_Finish_Enabling_Time;
+  uint32_t Protection_Start_Disabling_Time;
+  uint32_t Protection_Finish_Disabling_Time;
   uint32_t Disable_Start_Time;
   uint32_t Reset_Enable_Driver_Time;
+  uint32_t Reset_Disable_Driver_Time;
   uint8_t Enable_Attempts;
   uint8_t Disable_Attempts;
-  uint32_t Time_Attempts;
+  uint32_t Time_Attempt;
   bool_t State;
   bool_t Protection_Was_Enabled;
   bool_t Protection_Was_Disabled;
   bool_t In_Process_Enabling;
   bool_t In_Process_Disabling;
+  bool_t Not_Opened_At_First_Attempt;
+  bool_t Finish_Enabling;
+  bool_t Waiting_Process_Driver_Enabling;
+  bool_t Waiting_Process_Driver_Disabling;
   bool_t Faulty_Driver;
 }DRIVER_t;
 
@@ -150,6 +162,12 @@ DRIVER_t Drivers[4] = {
 };
 
 bool_t bl_Output_Value[64U];
+
+bool_t bl_Driver_Command[4U];
+
+bool In_Loop_Attempts;
+
+int current_Driver_In_Loop;
 
 /******************************************************************************
  *     Function Prototypes
@@ -434,10 +452,9 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
             break;
     }
     driver->Start_Time = currentTime;
-    driver->Protection_Start_Time = currentTime + 250;
-    driver->Protection_Disable_Time = currentTime + 750;
+    driver->Protection_Start_Enabling_Time = currentTime + 500;
+    driver->Protection_Finish_Enabling_Time = currentTime + 750;
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
-    driver->In_Process_Enabling = 1;
 }
 
 // Отключение драйвера
@@ -460,7 +477,6 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
             break;
     }
-    driver->In_Process_Disabling = 1;
 }
 
 // Сброс сигнала включения драйвера
@@ -483,7 +499,8 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
             MODULE_BZK_TX.bl_X5_10_OUT = 0;
             break;
     }
-    driver->In_Process_Disabling = 0;
+    driver->Protection_Start_Disabling_Time = 0;
+    driver->Protection_Finish_Disabling_Time = 0;
 }
 
 // Сброс сигнала отключения драйвера
@@ -506,7 +523,8 @@ void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
             MODULE_BZK_TX.bl_X5_9_OUT = 0;
             break;
     }
-    driver->In_Process_Enabling = 0;
+    driver->Protection_Start_Enabling_Time = 0;
+    driver->Protection_Finish_Enabling_Time = 0;
 }
 
 // Проверка наличия хотя бы одного драйвера в состоянии переключения
@@ -518,6 +536,19 @@ bool AnyDriverInProcess() {
     }
     return false;
 }
+
+bool AtLeastOneDiverInProccess() {
+  int count = 0;
+    for (int i = 0; i < 4; i++) {
+        if (Drivers[i].In_Process_Enabling == 1 || Drivers[i].In_Process_Disabling == 1) {
+            count++;
+            if (count > 1) {
+                return false;
+            }
+        }
+    }
+    return true;
+ }
 
 
 // Проверка наличия хотя бы одного включенного драйвера
@@ -531,96 +562,141 @@ bool AnyDriverEnabled() {
 }
 
 
-void ProcessDriverEnabling(uint32_t currentTime) {
+void RecordDriverCommands() {
     for (int i = 0; i < 4; i++) {
-        if (!AnyDriverInProcess() && Waiting_Process_Driver_Enabling == 0 && Waiting_Process_Driver_Disabling == 0 && Drivers[i].Enable_Attempts < 3) {
-          if (bl_Output_Value[i] != 0x00 && Drivers[i].State == 0 && Drivers[i].Protection_Was_Enabled != 1 && Drivers[i].In_Process_Enabling == 0) {
-              EnableDriver(&Drivers[i], currentTime, i);
-              Waiting_Process_Driver_Enabling = 1;
-              Drivers[i].Enable_Attempts++;
-          }
-        }
-
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 1) {
-            EnableProtection();
-            Drivers[i].Protection_Was_Enabled = 1;
-        }
-
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 1) {
-            DisableProtection();
-            Drivers[i].Protection_Was_Disabled = 1;
-            Drivers[i].Protection_Disable_Time = 0;
-        }
-
-        if (Drivers[i].State == 1 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-            ResetEnablingDriver(&Drivers[i], i);
-            Drivers[i].Reset_Enable_Driver_Time = 0;
-            Waiting_Process_Driver_Enabling = 0;
-            Drivers[i].Enable_Attempts = 0;
-        }
-
-        if (Drivers[i].State == 0 && currentTime >= Drivers[i].Reset_Enable_Driver_Time) {
-            ResetEnablingDriver(&Drivers[i], i);
-            Drivers[i].Reset_Enable_Driver_Time = 0;
-            Drivers[i].Faulty_Driver = 1;
-            Waiting_Process_Driver_Enabling = 0;
-//            AttemptsEnabling(&Drivers[i], currentTime , i);
-
-        }
+      if (bl_Driver_Command[i] != bl_Output_Value[i]) {
+          bl_Driver_Command[i] = bl_Output_Value[i];
+      }
     }
 }
 
 
+void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
+        if (bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts == 1) {
+            currentDriverIndex = current_Driver_In_Loop;
+        }
+
+        if (!AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] != 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled != 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
+            EnableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
+            Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling = 1;
+            Drivers[currentDriverIndex].In_Process_Enabling = 1;
+            Drivers[currentDriverIndex].Disable_Attempts = 0;
+            step_1_enabling = 1;
+            a_1++;
+        }
+
+        if (AtLeastOneDiverInProccess()) {
+          if (step_1_enabling == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Start_Enabling_Time && Drivers[currentDriverIndex].Protection_Was_Enabled != 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
+              EnableProtection();
+              Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
+              step_2_enabling = 1;
+              b_2++;
+          }
+
+          if (step_2_enabling == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Finish_Enabling_Time && Drivers[currentDriverIndex].Protection_Was_Disabled != 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
+              DisableProtection();
+              Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
+              step_3_enabling = 1;
+              c_3++;
+          }
+
+          if (step_3_enabling == 1 && currentTime >= Drivers[currentDriverIndex].Reset_Enable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
+              ResetEnablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
+              Drivers[currentDriverIndex].Reset_Enable_Driver_Time = 0;
+              Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling = 0;
+              Drivers[currentDriverIndex].In_Process_Enabling = 0;
+              d_4++;
+              step_1_enabling = 0;
+              step_2_enabling = 0;
+              step_3_enabling = 0;
+              In_Loop_Attempts = 0;
+
+              if (Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
+                  Drivers[currentDriverIndex].Not_Opened_At_First_Attempt = 1;
+                  Drivers[currentDriverIndex].Protection_Was_Enabled = 0;
+                  Drivers[currentDriverIndex].Protection_Was_Disabled = 0;
+                  Drivers[currentDriverIndex].Enable_Attempts++;
+                  current_Driver_In_Loop = currentDriverIndex;
+                  In_Loop_Attempts = 1;
+                  e_5++;
+              }
+          }
+      }
+}
 
 
 // Обработка отключения драйверов
-void ProcessDriverDisabling(uint32_t currentTime) {
-    for (int i = 0; i < 4; i++) {
-        if (bl_Output_Value[i] == 0x00 && Drivers[i].State == 1) {
-          if (!AnyDriverInProcess() && Waiting_Process_Driver_Disabling == 0 && Waiting_Process_Driver_Enabling == 0) {
-                if (Drivers[i].Disable_Start_Time == 0) {
-                    Drivers[i].Disable_Start_Time = currentTime + 1000;
-                    Drivers[i].Protection_Start_Time = currentTime + 250;
-                    Drivers[i].Protection_Disable_Time = currentTime + 750;
-                    Waiting_Process_Driver_Disabling = 1;
+void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 
-                }
-
-                if (currentTime >= Drivers[i].Disable_Start_Time) {
-                    DisableDriver(&Drivers[i], currentTime, i);
-                }
+          if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts == 1) {
+              currentDriverIndex = current_Driver_In_Loop;
           }
 
+          if (bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Not_Opened_At_First_Attempt == 1) {
+              Drivers[currentDriverIndex].Not_Opened_At_First_Attempt = 0;
+              Drivers[currentDriverIndex].Enable_Attempts = 0;
+              Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
+              Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
+          }
 
-                if (currentTime >= Drivers[i].Protection_Start_Time && Drivers[i].Protection_Was_Enabled != 0) {
-                    EnableProtection();
-                    Drivers[i].Protection_Was_Enabled = 0;
-                }
+          if (!AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0) {
+              if (Drivers[currentDriverIndex].Reset_Disable_Driver_Time == 0) {
+                  Drivers[currentDriverIndex].Reset_Disable_Driver_Time = currentTime + 1000;
+                  Drivers[currentDriverIndex].Protection_Start_Disabling_Time = currentTime + 250;
+                  Drivers[currentDriverIndex].Protection_Finish_Disabling_Time = currentTime + 750;
+                  DisableDriver(&Drivers[currentDriverIndex], currentTime, currentDriverIndex);
+                  Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling = 1;
+                  a_10++;
+                  step_1_disabling = 1;
+                  Drivers[currentDriverIndex].In_Process_Disabling = 1;
+              }
+          }
 
-                if (currentTime >= Drivers[i].Protection_Disable_Time && Drivers[i].Protection_Was_Disabled != 0) {
-                    DisableProtection();
-                    Drivers[i].Protection_Was_Disabled = 0;
-                    Drivers[i].Protection_Disable_Time = 0;
-                }
-         }
-
-              if (Drivers[i].State == 0 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
-                    ResetDisablingDriver(&Drivers[i], i);
-                    Drivers[i].Disable_Start_Time = 0;
-                    Drivers[i].Disable_Attempts = 0;
-                    Waiting_Process_Driver_Disabling = 0;
+             if (step_1_disabling == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Start_Disabling_Time && Drivers[currentDriverIndex].Protection_Was_Enabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1) {
+                 EnableProtection();
+                 Drivers[currentDriverIndex].Protection_Was_Enabled = 0;
+                 c_30++;
+                 step_2_disabling = 1;
              }
 
-              if (Drivers[i].State == 1 && currentTime >= Drivers[i].Disable_Start_Time + 1000) {
-                  ResetDisablingDriver(&Drivers[i], i);
-                  Drivers[i].Disable_Start_Time = 0;
-                  Drivers[i].Disable_Attempts = 0;
-                  Drivers[i].Faulty_Driver = 1;
-                  Waiting_Process_Driver_Disabling = 0;
-              }
-     }
+             if (step_2_disabling == 1 && currentTime >= Drivers[currentDriverIndex].Protection_Finish_Disabling_Time && Drivers[currentDriverIndex].Protection_Was_Disabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1) {
+                 DisableProtection();
+                 Drivers[currentDriverIndex].Protection_Was_Disabled = 0;
+                 d_40++;
+                 step_3_disabling = 1;
+             }
+
+             if (step_3_disabling == 1 && currentTime >= Drivers[currentDriverIndex].Reset_Disable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1) {
+                 ResetDisablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
+                 Drivers[currentDriverIndex].Reset_Disable_Driver_Time = 0;
+                 Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling = 0;
+                 e_50++;
+                 step_1_disabling = 0;
+                 step_2_disabling = 0;
+                 step_3_disabling = 0;
+                 In_Loop_Attempts = 0;
+                 Drivers[currentDriverIndex].In_Process_Disabling = 0;
+
+                 if (Drivers[currentDriverIndex].State == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
+                     Drivers[currentDriverIndex].Not_Opened_At_First_Attempt = 1;
+                     Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
+                     Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
+                     Drivers[currentDriverIndex].Disable_Attempts++;
+                     current_Driver_In_Loop = currentDriverIndex;
+                     In_Loop_Attempts = 1;
+                     f_60++;
+                 }
+             }
 }
 
+
+void ManageDrivers(uint32_t currentTime) {
+    RecordDriverCommands();
+    for (uint8_t i = 0; i < 4; i++) {
+           ProcessDriverEnabling(currentTime, i);
+           ProcessDriverDisabling(currentTime, i);
+    }
+ }
 
 
 
@@ -628,16 +704,15 @@ void ProcessDriverDisabling(uint32_t currentTime) {
 // Основная функция обработки драйверов
 void ProcessDrivers(uint32_t currentTime) {
     if (AnyDriverEnabled()) {
-      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, 1);
+      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
     } else {
-      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, 1);
+      HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
     }
 
-    UpdateDriverStates();
-    ProcessDriverEnabling(currentTime);
-    ProcessDriverDisabling(currentTime);
-}
 
+    UpdateDriverStates();
+    ManageDrivers(currentTime);
+}
 
 
 /* USER CODE END 0 */
@@ -866,37 +941,180 @@ int main(void)
                  MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
 
 
-                 if (currentTime - lastMsgTime > timeout)
-                     {
-                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                     }
-                     else
-                     {
-                       HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                     }
+                 // Достигнут аварийный уровень ошибок в сети FDCAN
+                                if ((FDCAN_PSR_BO & READ_REG(hfdcan1.Instance->PSR)) != 0)
+                                {
+                                    bl_BusOff_LED = TRUE;
+                                }
+                                else
+                                {
+                                    bl_BusOff_LED = FALSE;
+
+                                    // Достигнут предупредительный уровень ошибок в сети FDCAN
+                                    if (((FDCAN_PSR_EW | FDCAN_PSR_EP) & READ_REG(hfdcan1.Instance->PSR)) != 0)
+                                    {
+                                        bl_Warning_LED = TRUE;
+                                    }
+                                    else
+                                    {
+                                        bl_Warning_LED = FALSE;
+                                    }
+                                }
 
 
-                 if (bl_TIMER_LED)
-                    {
-                      switch (ui8_Index_LED)
-                      {
-                        case 0:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
-                          break;
-                        case 1:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          break;
-                        default:
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
-                          break;
-                      }
+                                if (currentTime - lastMsgTime > timeout)
+                                    {
+                                      bl_Operational_LED = false;
+                                    }
+                                    else
+                                    {
+                                      bl_Operational_LED = true;
+                                    }
 
-                      ui8_Index_LED++;
-                      if (ui8_Index_LED > 6)
-                      {
-                        ui8_Index_LED = 0;
-                      }
-                    }
+
+               //                 if (bl_TIMER_LED)
+               //                    {
+               //                      switch (ui8_Index_LED)
+               //                      {
+               //                        case 0:
+               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_RESET && (!bl_TP_Init_End)));
+               //                          break;
+               //                        case 1:
+               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
+               //                          break;
+               //                        default:
+               //                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, (GPIO_PIN_SET && (!bl_TP_Init_End)));
+               //                          break;
+               //                      }
+
+
+                                if (bl_TIMER_LED)
+                                  {
+                                    switch (ui8_Index_LED)
+                                    {
+                                      case 0:
+                                        if (bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        if (bl_Warning_LED || bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      case 1:
+                                        if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        }
+                                        if (bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      case 2:
+                                        if (bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        }
+                                        if (bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      case 3:
+                                        if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        }
+                                        if (bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      case 4:
+                                        if (bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        }
+                                        if (bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      case 5:
+                                        if (bl_PreoperationalMode_LED || bl_Operational_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        }
+                                        if (bl_BusOff_LED || bl_TP_Init_End)
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+                                        }
+                                        else
+                                        {
+                                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        }
+                                        break;
+                                      default:
+                                        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+                                        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+                                        break;
+                                    }
+
+
+
+                                     ui8_Index_LED++;
+                                     if (ui8_Index_LED > 5)
+                                     {
+                                       ui8_Index_LED = 0;
+                                     }
+                                   }
+
 
     /* USER CODE END WHILE */
 
