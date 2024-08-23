@@ -117,7 +117,6 @@ static int a_1, b_2, c_3, d_4, e_5, f_6, g_7, h_8, i_9, a_10, b_20, c_30, d_40, 
 
 static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_1_disabling, step_2_disabling, step_3_disabling;
 
-
 static bool_t  bl_Warning_LED, bl_BusOff_LED, bl_PreoperationalMode_LED, bl_Operational_LED;
 
 static uint8_t Disabling_After_Power_Supply_0;
@@ -428,6 +427,10 @@ void HAL_FDCAN_ErrorCallback(FDCAN_HandleTypeDef *hfdcan)
   );
 }
 
+/******************************************************************************
+ * Function Name: UpdateDriverStates
+ * Description: Запись / обновление состояний драйверов
+ ******************************************************************************/
 void UpdateDriverStates() {
     Drivers[0].State = EPRO_Test_Bit(ui32_Input_Value, 7);
     Drivers[1].State = EPRO_Test_Bit(ui32_Input_Value, 8);
@@ -440,19 +443,29 @@ void UpdateDriverStates() {
 //    Drivers[3].State = MODULE_BZK_TX.bl_X5_14_IN; // bl_X5_9_OUT
 }
 
-// Функция для включения защиты
+/******************************************************************************
+ * Function Name: EnableProtection
+ * Description: Подача сигнала на включение "защиты"
+ ******************************************************************************/
 void EnableProtection() {
     HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
     MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
 }
 
+/******************************************************************************
+ * Function Name: DisableProtection
+ * Description: Подача сигнала на отключение "защиты"
+ ******************************************************************************/
 // Функция для отключения защиты
 void DisableProtection() {
   HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
   MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
 }
 
-// Включение драйвера
+/******************************************************************************
+ * Function Name: EnableDriver
+ * Description: Подача сигнала на включение драйвера
+ ******************************************************************************/
 void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -482,7 +495,10 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
     driver->Reset_Enable_Driver_Time = currentTime + 1000;
 }
 
-// Отключение драйвера
+/******************************************************************************
+ * Function Name: DisableDriver
+ * Description: Подача сигнала на отключение драйвера
+ ******************************************************************************/
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -508,7 +524,10 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
     }
 }
 
-// Сброс сигнала включения драйвера
+/******************************************************************************
+ * Function Name: ResetDisablingDriver
+ * Description: Сброс сигнала на отключение драйвера
+ ******************************************************************************/
 void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -532,7 +551,10 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     driver->Protection_Finish_Disabling_Time = 0;
 }
 
-// Сброс сигнала отключения драйвера
+/******************************************************************************
+ * Function Name: ResetEnablingDriver
+ * Description: Сброс сигнала на включение драйвера
+ ******************************************************************************/
 void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
@@ -556,7 +578,10 @@ void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     driver->Protection_Finish_Enabling_Time = 0;
 }
 
-// Проверка наличия хотя бы одного драйвера в состоянии переключения
+/******************************************************************************
+ * Function Name: AnyDriverInProcess
+ * Description: Проверка наличия хотя бы одного драйвера в состоянии переключения
+ ******************************************************************************/
 bool AnyDriverInProcess() {
     for (int i = 0; i < 4; i++) {
         if (Drivers[i].In_Process_Enabling == 1 || Drivers[i].In_Process_Disabling == 1) {
@@ -566,21 +591,10 @@ bool AnyDriverInProcess() {
     return false;
 }
 
-bool AtLeastOneDiverInProccess() {
-  int count = 0;
-    for (int i = 0; i < 4; i++) {
-        if (Drivers[i].In_Process_Enabling == 1 || Drivers[i].In_Process_Disabling == 1) {
-            count++;
-            if (count > 1) {
-                return false;
-            }
-        }
-    }
-    return true;
- }
-
-
-// Проверка наличия хотя бы одного включенного драйвера
+/******************************************************************************
+ * Function Name: AnyDriverEnabled
+ * Description: Проверка наличия хотя бы одного включенного драйвера
+ ******************************************************************************/
 bool AnyDriverEnabled() {
     for (int i = 0; i < 4; i++) {
         if (Drivers[i].State == 1) {
@@ -590,7 +604,10 @@ bool AnyDriverEnabled() {
     return false;
 }
 
-
+/******************************************************************************
+ * Function Name: RecordDriverCommands
+ * Description: Запись / обновление комманд управления драйверами
+ ******************************************************************************/
 void RecordDriverCommands() {
     for (int i = 0; i < 4; i++) {
       if (bl_Driver_Command[i] != bl_Output_Value[i]) {
@@ -599,7 +616,10 @@ void RecordDriverCommands() {
     }
 }
 
-
+/******************************************************************************
+ * Function Name: ProcessDriverEnabling
+ * Description: Процесс включения драйвера с включением защиты
+ ******************************************************************************/
 void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
         if (bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts_Enabling == 1 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
             currentDriverIndex = current_Driver_In_Loop;
@@ -664,8 +684,10 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
         }
 }
 
-
-// Обработка отключения драйверов
+/******************************************************************************
+ * Function Name: ProcessDriverDisabling
+ * Description: Процесс отключения драйвера с включением защиты
+ ******************************************************************************/
 void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 
           if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts_Disabling == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
@@ -743,7 +765,10 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 }
 
 
-
+/******************************************************************************
+ * Function Name: ManageDrivers
+ * Description: Управление процессами включения и отключения драйверов
+ ******************************************************************************/
 void ManageDrivers(uint32_t currentTime) {
     RecordDriverCommands();
     for (uint8_t i = 0; i < 4; i++) {
@@ -752,7 +777,10 @@ void ManageDrivers(uint32_t currentTime) {
     }
 }
 
-
+/******************************************************************************
+ * Function Name: ProcessDrivers
+ * Description: Главная функция менеджмента драйверами и желтым светодиодом
+ ******************************************************************************/
 // Основная функция обработки драйверов
 void ProcessDrivers(uint32_t currentTime) {
     if (AnyDriverEnabled()) {
