@@ -181,7 +181,7 @@ bool_t bl_Output_Value[64U];
 
 bool_t bl_Driver_Command[4U];
 
-bool In_Loop_Attempts;
+bool In_Loop_Attempts_Enabling, In_Loop_Attempts_Disabling;
 
 int current_Driver_In_Loop;
 
@@ -458,22 +458,22 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
         case 0:
             HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, 1);
             MODULE_BZK_TX.bl_X5_3_OUT = 1;
-            MODULE_BZK_TX.bl_X5_11_IN = 1;
+//            MODULE_BZK_TX.bl_X5_11_IN = 1;
             break;
         case 1:
             HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, 1);
             MODULE_BZK_TX.bl_X5_5_OUT = 1;
-            MODULE_BZK_TX.bl_X5_12_IN = 1;
+//            MODULE_BZK_TX.bl_X5_12_IN = 1;
             break;
         case 2:
             HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, 1);
             MODULE_BZK_TX.bl_X5_7_OUT = 1;
-            MODULE_BZK_TX.bl_X5_13_IN = 1;
+//            MODULE_BZK_TX.bl_X5_13_IN = 1;
             break;
         case 3:
             HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, 1);
             MODULE_BZK_TX.bl_X5_9_OUT = 1;
-            MODULE_BZK_TX.bl_X5_14_IN = 1;
+//            MODULE_BZK_TX.bl_X5_14_IN = 1;
             break;
     }
     driver->Start_Time = currentTime;
@@ -488,22 +488,22 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
         case 0:
             HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
             MODULE_BZK_TX.bl_X5_4_OUT = 1;
-            MODULE_BZK_TX.bl_X5_11_IN = 0;
+//            MODULE_BZK_TX.bl_X5_11_IN = 0;
             break;
         case 1:
             HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
             MODULE_BZK_TX.bl_X5_6_OUT = 1;
-            MODULE_BZK_TX.bl_X5_12_IN = 0;
+//            MODULE_BZK_TX.bl_X5_12_IN = 0;
             break;
         case 2:
             HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
             MODULE_BZK_TX.bl_X5_8_OUT = 1;
-            MODULE_BZK_TX.bl_X5_13_IN = 0;
+//            MODULE_BZK_TX.bl_X5_13_IN = 0;
             break;
         case 3:
             HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
             MODULE_BZK_TX.bl_X5_10_OUT = 1;
-            MODULE_BZK_TX.bl_X5_14_IN = 0;
+//            MODULE_BZK_TX.bl_X5_14_IN = 0;
             break;
     }
 }
@@ -601,12 +601,13 @@ void RecordDriverCommands() {
 
 
 void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
-        if (bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts == 1 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
+        if (bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts_Enabling == 1 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
             currentDriverIndex = current_Driver_In_Loop;
         }
 
-        if (currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && bl_Driver_Command[currentDriverIndex] != 0x00 && In_Loop_Attempts == 0 && Drivers[currentDriverIndex].Enable_Attempts < 3 && Drivers[currentDriverIndex].Disable_Attempts >= 3) {
+        if (/*currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && */bl_Driver_Command[currentDriverIndex] != 0x00/* && In_Loop_Attempts_Disabling == 0 && Drivers[currentDriverIndex].Enable_Attempts < 3 && Drivers[currentDriverIndex].Disable_Attempts >= 3*/) {
             Drivers[currentDriverIndex].Disable_Attempts = 0;
+            In_Loop_Attempts_Disabling = 0;
         }
 
         if (currentTime >= Drivers[currentDriverIndex].Time_Attempt_Enabling && currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && !AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] != 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled != 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
@@ -638,7 +639,7 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
             step_1_enabling = 0;
             step_2_enabling = 0;
             step_3_enabling = 0;
-            In_Loop_Attempts = 0;
+            In_Loop_Attempts_Enabling = 0;
         }
 
         if (step_3_enabling == 1 && currentTime >= Drivers[currentDriverIndex].Reset_Enable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0 && Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Enable_Attempts < 3) {
@@ -656,9 +657,9 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
             Drivers[currentDriverIndex].Enable_Attempts++;
             current_Driver_In_Loop = currentDriverIndex;
             if (Drivers[currentDriverIndex].Enable_Attempts < 3) {
-            In_Loop_Attempts = 1;
+            In_Loop_Attempts_Enabling = 1;
             } else {
-            In_Loop_Attempts = 0;
+            In_Loop_Attempts_Enabling = 0;
             }
         }
 }
@@ -667,8 +668,12 @@ void ProcessDriverEnabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 // Обработка отключения драйверов
 void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
 
-          if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
+          if (bl_Driver_Command[currentDriverIndex] == 0x00 && In_Loop_Attempts_Disabling == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
               currentDriverIndex = current_Driver_In_Loop;
+          }
+
+          if (bl_Driver_Command[currentDriverIndex] == 0x00) {
+            In_Loop_Attempts_Enabling = 0;
           }
 
           if (currentTime >= Drivers[currentDriverIndex].Time_Attempt_Enabling && currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Not_Opened_At_First_Attempt == 1) {
@@ -676,6 +681,7 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
               Drivers[currentDriverIndex].Enable_Attempts = 0;
               Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
               Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
+              a_1++;
           }
 
           if (currentTime >= Drivers[currentDriverIndex].Time_Attempt_Enabling && currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && !AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
@@ -703,18 +709,18 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
                  step_3_disabling = 1;
              }
 
-             if (step_3_disabling == 1 && bl_Driver_Command[currentDriverIndex] == 0x00 && currentTime >= Drivers[currentDriverIndex].Reset_Disable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1 && Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
+             if (step_3_disabling == 1 && /*bl_Driver_Command[currentDriverIndex] == 0x00 && */currentTime >= Drivers[currentDriverIndex].Reset_Disable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1 && Drivers[currentDriverIndex].State == 0 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
                  ResetDisablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
                  Drivers[currentDriverIndex].Reset_Disable_Driver_Time = 0;
                  Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling = 0;
                  step_1_disabling = 0;
                  step_2_disabling = 0;
                  step_3_disabling = 0;
-                 In_Loop_Attempts = 0;
+                 In_Loop_Attempts_Disabling = 0;
                  Drivers[currentDriverIndex].In_Process_Disabling = 0;
              }
 
-             if (step_3_disabling == 1 && bl_Driver_Command[currentDriverIndex] == 0x00 && currentTime >= Drivers[currentDriverIndex].Reset_Disable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1 && Drivers[currentDriverIndex].State == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
+             if (step_3_disabling == 1 && /*bl_Driver_Command[currentDriverIndex] == 0x00 && */currentTime >= Drivers[currentDriverIndex].Reset_Disable_Driver_Time && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 1 && Drivers[currentDriverIndex].State == 1 && Drivers[currentDriverIndex].Disable_Attempts < 3) {
                  ResetDisablingDriver(&Drivers[currentDriverIndex], currentDriverIndex);
                  Drivers[currentDriverIndex].Reset_Disable_Driver_Time = 0;
                  Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling = 0;
@@ -729,9 +735,9 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
                  Drivers[currentDriverIndex].Disable_Attempts++;
                  current_Driver_In_Loop = currentDriverIndex;
                  if (Drivers[currentDriverIndex].Disable_Attempts < 3) {
-                 In_Loop_Attempts = 1;
+                 In_Loop_Attempts_Disabling = 1;
                  } else {
-                 In_Loop_Attempts = 0;
+                 In_Loop_Attempts_Disabling = 0;
                  }
              }
 }
@@ -811,8 +817,6 @@ int main(void)
   uint32_t Start_Disabling_After_Power_Supply_1 = currentTime + 2000;
   uint32_t Start_Disabling_After_Power_Supply_2 = currentTime + 3500;
   uint32_t Start_Disabling_After_Power_Supply_3 = currentTime + 5000;
-
-
 
 
   // Фоновый цикл
