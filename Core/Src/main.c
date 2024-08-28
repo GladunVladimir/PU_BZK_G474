@@ -20,6 +20,7 @@
 #include "main.h"
 #include <string.h>
 #include "usbd_cdc_if.h"
+#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -117,11 +118,9 @@ static bool_t bl_TIMER_CAN;
 static uint8_t ui8_Index_LED;
 
 uint32_t lastMsgTime = 0;
-const uint32_t timeout = 1000; // 100 миллисекунд таймаута
+const uint32_t timeout = 1000; // 1000 миллисекунд таймаута
 
 static bool_t First_Disabling;
-
-static uint8_t a_1, b_2, c_3, d_4, e_5, f_6, g_7, h_8, i_9, a_10, b_20, c_30, d_40, e_50, f_60, g_70, h_80, i_90;
 
 static bool_t step_1_enabling, step_2_enabling, step_3_enabling, step_1_disabling, step_2_disabling, step_3_disabling;
 
@@ -145,8 +144,6 @@ static uint32_t After_Power_Supply_Protection_Disabling_Time_2;
 static uint32_t After_Power_Supply_Protection_Disabling_Time_3;
 
 #if (bl_Modbus_Slave_Use_USB != 0)
-
-
 extern uint16_t ui16_Modbus_Holding_Registers_Data_USB[Modbus_Slave_Holding_Registers_Count_USB];
 uint8_t ui8_Modbus_Slave_Buffer_Data_USB[Modbus_Slave_Buffer_Size_USB];
 static uint16_t ui16_Modbus_Slave_Buffer_Transmit_Count_USB;
@@ -178,10 +175,6 @@ uint8_t ui8_USB_Bootloader_Mode;
 
 typedef struct
 {
-  GPIO_TypeDef* GPIO_Port_Enable;
-  uint16_t GPIO_Pin_Enable;
-  GPIO_TypeDef* GPIO_Port_Disable;
-  uint16_t GPIO_Pin_Disable;
   uint32_t Start_Time;
   uint32_t Protection_Start_Enabling_Time;
   uint32_t Protection_Finish_Enabling_Time;
@@ -209,10 +202,10 @@ typedef struct
 
 
 DRIVER_t Drivers[4] = {
-    {OUT_D_17_GPIO_Port, OUT_D_17_Pin, OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {OUT_D_19_GPIO_Port, OUT_D_19_Pin, OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {OUT_D_21_GPIO_Port, OUT_D_21_Pin, OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {OUT_D_23_GPIO_Port, OUT_D_23_Pin, OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
 bool_t bl_Output_Value[64U];
@@ -920,15 +913,15 @@ void Modbus_Poll_USB(void)
  * Description: Запись / обновление состояний драйверов
  ******************************************************************************/
 void UpdateDriverStates() {
-//    Drivers[0].State = EPRO_Test_Bit(ui32_Input_Value, 7);
-//    Drivers[1].State = EPRO_Test_Bit(ui32_Input_Value, 8);
-//    Drivers[2].State = EPRO_Test_Bit(ui32_Input_Value, 9);
-//    Drivers[3].State = EPRO_Test_Bit(ui32_Input_Value, 10);
+    Drivers[0].State = EPRO_Test_Bit(ui32_Input_Value, 7);
+    Drivers[1].State = EPRO_Test_Bit(ui32_Input_Value, 8);
+    Drivers[2].State = EPRO_Test_Bit(ui32_Input_Value, 9);
+    Drivers[3].State = EPRO_Test_Bit(ui32_Input_Value, 10);
 
-    Drivers[0].State = MODULE_BZK_TX.bl_X5_11_IN; // bl_X5_3_OUT
-    Drivers[1].State = MODULE_BZK_TX.bl_X5_12_IN; // bl_X5_5_OUT
-    Drivers[2].State = MODULE_BZK_TX.bl_X5_13_IN; // bl_X5_7_OUT
-    Drivers[3].State = MODULE_BZK_TX.bl_X5_14_IN; // bl_X5_9_OUT
+//    Drivers[0].State = MODULE_BZK_TX.bl_X5_11_IN; // bl_X5_3_OUT
+//    Drivers[1].State = MODULE_BZK_TX.bl_X5_12_IN; // bl_X5_5_OUT
+//    Drivers[2].State = MODULE_BZK_TX.bl_X5_13_IN; // bl_X5_7_OUT
+//    Drivers[3].State = MODULE_BZK_TX.bl_X5_14_IN; // bl_X5_9_OUT
 }
 
 /******************************************************************************
@@ -936,8 +929,8 @@ void UpdateDriverStates() {
  * Description: Подача сигнала на включение "защиты"
  ******************************************************************************/
 void EnableProtection() {
-//    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-    MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+    HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
+    MODULE_BZK_TX.bl_XP10_2_OUT = 1;
 }
 
 /******************************************************************************
@@ -946,8 +939,8 @@ void EnableProtection() {
  ******************************************************************************/
 // Функция для отключения защиты
 void DisableProtection() {
-//  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-  MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
+  MODULE_BZK_TX.bl_XP10_2_OUT = 0;
 }
 
 /******************************************************************************
@@ -957,24 +950,24 @@ void DisableProtection() {
 void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-//            HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, 1);
-            MODULE_BZK_TX.bl_X5_3_OUT = 1;
-            MODULE_BZK_TX.bl_X5_11_IN = 1;
+            HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_3_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_11_IN = 1;
             break;
         case 1:
-//            HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, 1);
-            MODULE_BZK_TX.bl_X5_5_OUT = 1;
-            MODULE_BZK_TX.bl_X5_12_IN = 1;
+            HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_5_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_12_IN = 1;
             break;
         case 2:
-//            HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, 1);
-            MODULE_BZK_TX.bl_X5_7_OUT = 1;
-            MODULE_BZK_TX.bl_X5_13_IN = 1;
+            HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_7_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_13_IN = 1;
             break;
         case 3:
-//            HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, 1);
-            MODULE_BZK_TX.bl_X5_9_OUT = 1;
-            MODULE_BZK_TX.bl_X5_14_IN = 1;
+            HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_9_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_14_IN = 1;
             break;
     }
     driver->Start_Time = currentTime;
@@ -990,24 +983,24 @@ void EnableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverI
 void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-//            HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
-            MODULE_BZK_TX.bl_X5_4_OUT = 1;
-            MODULE_BZK_TX.bl_X5_11_IN = 0;
+            HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_4_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_11_IN = 0;
             break;
         case 1:
-//            HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
-            MODULE_BZK_TX.bl_X5_6_OUT = 1;
-            MODULE_BZK_TX.bl_X5_12_IN = 0;
+            HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_6_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_12_IN = 0;
             break;
         case 2:
-//            HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
-            MODULE_BZK_TX.bl_X5_8_OUT = 1;
-            MODULE_BZK_TX.bl_X5_13_IN = 0;
+            HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_8_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_13_IN = 0;
             break;
         case 3:
-//            HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
-            MODULE_BZK_TX.bl_X5_10_OUT = 1;
-            MODULE_BZK_TX.bl_X5_14_IN = 0;
+            HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
+            MODULE_BZK_TX.bl_XP9_10_OUT = 1;
+            MODULE_BZK_TX.bl_XP9_14_IN = 0;
             break;
     }
 }
@@ -1019,20 +1012,20 @@ void DisableDriver(DRIVER_t* driver, uint32_t currentTime, uint8_t currentDriver
 void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-//            HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0);
-            MODULE_BZK_TX.bl_X5_4_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_4_OUT = 0;
             break;
         case 1:
-//            HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0);
-            MODULE_BZK_TX.bl_X5_6_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_6_OUT = 0;
             break;
         case 2:
-//            HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0);
-            MODULE_BZK_TX.bl_X5_8_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_8_OUT = 0;
             break;
         case 3:
-//            HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0);
-            MODULE_BZK_TX.bl_X5_10_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_10_OUT = 0;
             break;
     }
     driver->Protection_Start_Disabling_Time = 0;
@@ -1046,20 +1039,20 @@ void ResetDisablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
 void ResetEnablingDriver(DRIVER_t* driver, uint8_t currentDriverIndex) {
     switch (currentDriverIndex) {
         case 0:
-//            HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, 0);
-            MODULE_BZK_TX.bl_X5_3_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_17_GPIO_Port, OUT_D_17_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_3_OUT = 0;
             break;
         case 1:
-//            HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, 0);
-            MODULE_BZK_TX.bl_X5_5_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_19_GPIO_Port, OUT_D_19_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_5_OUT = 0;
             break;
         case 2:
-//            HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, 0);
-            MODULE_BZK_TX.bl_X5_7_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_21_GPIO_Port, OUT_D_21_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_7_OUT = 0;
             break;
         case 3:
-//            HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, 0);
-            MODULE_BZK_TX.bl_X5_9_OUT = 0;
+            HAL_GPIO_WritePin(OUT_D_23_GPIO_Port, OUT_D_23_Pin, 0);
+            MODULE_BZK_TX.bl_XP9_9_OUT = 0;
             break;
     }
     driver->Protection_Start_Enabling_Time = 0;
@@ -1191,7 +1184,6 @@ void ProcessDriverDisabling(uint32_t currentTime, uint8_t currentDriverIndex) {
               Drivers[currentDriverIndex].Enable_Attempts = 0;
               Drivers[currentDriverIndex].Protection_Was_Enabled = 1;
               Drivers[currentDriverIndex].Protection_Was_Disabled = 1;
-              a_1++;
           }
 
           if (currentTime >= Drivers[currentDriverIndex].Time_Attempt_Enabling && currentTime >= Drivers[currentDriverIndex].Time_Attempt_Disabling && !AnyDriverInProcess() && bl_Driver_Command[currentDriverIndex] == 0x00 && Drivers[currentDriverIndex].Protection_Was_Enabled == 1 && Drivers[currentDriverIndex].Waiting_Process_Driver_Enabling == 0 && Drivers[currentDriverIndex].Waiting_Process_Driver_Disabling == 0 && Drivers[currentDriverIndex].Disable_Attempts < MAX_DISABLE_ATTEMPTS) {
@@ -1316,6 +1308,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_FDCAN1_Init();
+  MX_USB_Device_Init();
   MX_IWDG_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
@@ -1339,7 +1332,6 @@ int main(void)
   uint32_t Start_Disabling_After_Power_Supply_2 = currentTime + 3500;
   uint32_t Start_Disabling_After_Power_Supply_3 = currentTime + 5000;
 
-
   // Фоновый цикл
   while (1)
   {
@@ -1352,8 +1344,8 @@ int main(void)
 
       if (First_Disabling == 0) {
        if (Disabling_After_Power_Supply_0 == 0 && currentTime >= Start_Disabling_After_Power_Supply_0) {
-//           HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
-           MODULE_BZK_TX.bl_X5_4_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 1);
+           MODULE_BZK_TX.bl_XP9_4_OUT = 1;
 
 
            Disabling_After_Power_Supply_Time_0 = currentTime + 1000;
@@ -1363,8 +1355,8 @@ int main(void)
        }
 
        if (Disabling_After_Power_Supply_1 == 0 && currentTime >= Start_Disabling_After_Power_Supply_1) {
-//           HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
-           MODULE_BZK_TX.bl_X5_6_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 1);
+           MODULE_BZK_TX.bl_XP9_6_OUT = 1;
 
            Disabling_After_Power_Supply_Time_1 = currentTime + 1000;
            After_Power_Supply_Protection_Enabling_Time_1 = currentTime + 250;
@@ -1373,8 +1365,8 @@ int main(void)
        }
 
        if (Disabling_After_Power_Supply_2 == 0 && currentTime >= Start_Disabling_After_Power_Supply_2) {
-//           HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
-           MODULE_BZK_TX.bl_X5_8_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 1);
+           MODULE_BZK_TX.bl_XP9_8_OUT = 1;
 
            Disabling_After_Power_Supply_Time_2 = currentTime + 1000;
            After_Power_Supply_Protection_Enabling_Time_2 = currentTime + 250;
@@ -1383,8 +1375,8 @@ int main(void)
        }
 
        if (Disabling_After_Power_Supply_3 == 0 && currentTime >= Start_Disabling_After_Power_Supply_3) {
-//           HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
-           MODULE_BZK_TX.bl_X5_10_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 1);
+           MODULE_BZK_TX.bl_XP9_10_OUT = 1;
 
            Disabling_After_Power_Supply_Time_3 = currentTime + 1000;
            After_Power_Supply_Protection_Enabling_Time_3 = currentTime + 250;
@@ -1395,72 +1387,72 @@ int main(void)
 
 
        if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_0) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 1;
        }
 
        if (Disabling_After_Power_Supply_0 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_0) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 0;
        }
 
        if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_1) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 1;
        }
 
        if (Disabling_After_Power_Supply_1 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_1) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 0;
        }
 
        if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_2) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 1;
        }
 
        if (Disabling_After_Power_Supply_2 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_2) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 0;
        }
 
        if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Enabling_Time_3) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 1;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 1);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 1;
        }
 
        if (Disabling_After_Power_Supply_3 == 1 && currentTime >= After_Power_Supply_Protection_Disabling_Time_3) {
-//           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
-           MODULE_BZK_TX.bl_X4_1_X4_3_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, 0);
+           MODULE_BZK_TX.bl_XP10_2_OUT = 0;
        }
 
        if (Disabling_After_Power_Supply_0 == 1 && currentTime >= Disabling_After_Power_Supply_Time_0) {
-//           HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0);
-           MODULE_BZK_TX.bl_X5_4_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_18_GPIO_Port, OUT_D_18_Pin, 0);
+           MODULE_BZK_TX.bl_XP9_4_OUT = 0;
 
            Disabling_After_Power_Supply_0 = 2;
            Disabling_After_Power_Supply_Time_0 = 0;
        }
 
        if (Disabling_After_Power_Supply_1 == 1 && currentTime >= Disabling_After_Power_Supply_Time_1) {
-//           HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0);
-           MODULE_BZK_TX.bl_X5_6_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_20_GPIO_Port, OUT_D_20_Pin, 0);
+           MODULE_BZK_TX.bl_XP9_6_OUT = 0;
 
            Disabling_After_Power_Supply_1 = 2;
            Disabling_After_Power_Supply_Time_1 = 0;
        }
 
        if (Disabling_After_Power_Supply_2 == 1 && currentTime >= Disabling_After_Power_Supply_Time_2) {
-//           HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0);
-           MODULE_BZK_TX.bl_X5_8_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_22_GPIO_Port, OUT_D_22_Pin, 0);
+           MODULE_BZK_TX.bl_XP9_8_OUT = 0;
 
            Disabling_After_Power_Supply_2 = 2;
            Disabling_After_Power_Supply_Time_2 = 0;
        }
 
        if (Disabling_After_Power_Supply_3 == 1 && currentTime >= Disabling_After_Power_Supply_Time_3) {
-//           HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0);
-           MODULE_BZK_TX.bl_X5_10_OUT = 0;
+           HAL_GPIO_WritePin(OUT_D_24_GPIO_Port, OUT_D_24_Pin, 0);
+           MODULE_BZK_TX.bl_XP9_10_OUT = 0;
 
            Disabling_After_Power_Supply_3 = 2;
            Disabling_After_Power_Supply_Time_3 = 0;
@@ -1573,6 +1565,8 @@ int main(void)
       bl_Output_Value[13U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 13);
       bl_Output_Value[14U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 14);
       bl_Output_Value[15U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 15);
+
+
 //      bl_Output_Value[16U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[1U], 0);
 //      bl_Output_Value[17U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[1U], 1);
 //      bl_Output_Value[18U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[1U], 2);
@@ -1606,192 +1600,192 @@ int main(void)
     }
 #endif
 
-//    // Задаём состояние дискретных выходов
-//    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);
-//    HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[6U]);
-//    HAL_GPIO_WritePin(OUT_D_3_GPIO_Port, OUT_D_3_Pin, bl_Output_Value[7U]);
-//    HAL_GPIO_WritePin(OUT_D_4_GPIO_Port, OUT_D_4_Pin, bl_Output_Value[8U]);
-//    HAL_GPIO_WritePin(OUT_D_5_GPIO_Port, OUT_D_5_Pin, bl_Output_Value[9U]);
-//    HAL_GPIO_WritePin(OUT_D_6_GPIO_Port, OUT_D_6_Pin, bl_Output_Value[10U]);
-//    HAL_GPIO_WritePin(OUT_D_7_GPIO_Port, OUT_D_7_Pin, bl_Output_Value[4U]);
-//    HAL_GPIO_WritePin(OUT_D_8_GPIO_Port, OUT_D_8_Pin, bl_Output_Value[5U]);
-//    HAL_GPIO_WritePin(OUT_D_9_GPIO_Port, OUT_D_9_Pin, bl_Output_Value[12U]);
-//    HAL_GPIO_WritePin(OUT_D_10_GPIO_Port, OUT_D_10_Pin, bl_Output_Value[13U]);
-//    HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[14U]);
-//    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]);
-//
-//          // Считываем состояние дискретных входов
-//          ui32_Input_Value =
-//              (
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 0) |    // Инд. АВДУ1
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 1) |  // Инд. АВДУ2
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 2) |    // Инд. КМ7
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 3) |    // Инд. КМ8
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 4) |  // АВ ППН1
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 5) |  // АВ ППН2
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 6) |  // АВ ППН3
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 7) |  // Инд. QF1
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 8) |  // Инд. QF2
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 9) | // Инд. QF3
-//                  SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 10)   // Инд. QF4
-//              );
+    // Задаём состояние дискретных выходов
+    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);
+    HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[6U]);
+    HAL_GPIO_WritePin(OUT_D_3_GPIO_Port, OUT_D_3_Pin, bl_Output_Value[7U]);
+    HAL_GPIO_WritePin(OUT_D_4_GPIO_Port, OUT_D_4_Pin, bl_Output_Value[8U]);
+    HAL_GPIO_WritePin(OUT_D_5_GPIO_Port, OUT_D_5_Pin, bl_Output_Value[9U]);
+    HAL_GPIO_WritePin(OUT_D_6_GPIO_Port, OUT_D_6_Pin, bl_Output_Value[10U]);
+    HAL_GPIO_WritePin(OUT_D_7_GPIO_Port, OUT_D_7_Pin, bl_Output_Value[4U]);
+    HAL_GPIO_WritePin(OUT_D_8_GPIO_Port, OUT_D_8_Pin, bl_Output_Value[5U]);
+    HAL_GPIO_WritePin(OUT_D_9_GPIO_Port, OUT_D_9_Pin, bl_Output_Value[12U]);
+    HAL_GPIO_WritePin(OUT_D_10_GPIO_Port, OUT_D_10_Pin, bl_Output_Value[13U]);
+    HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[14U]);
+    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]);
+
+    // Считываем состояние дискретных входов
+    ui32_Input_Value =
+        (
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 0) |    // Инд. АВДУ1
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 1) |  // Инд. АВДУ2
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 2) |    // Инд. КМ7
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 3) |    // Инд. КМ8
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 4) |  // АВ ППН1
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 5) |  // АВ ППН2
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 6) |  // АВ ППН3
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 7) |  // Инд. QF1
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 8) |  // Инд. QF2
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 9) | // Инд. QF3
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 10)   // Инд. QF4
+        );
 
 
-          ProcessDrivers(currentTime);
+    ProcessDrivers(currentTime);
 
-//                  MODULE_BZK_TX.bl_X6_1_IN = EPRO_Test_Bit(ui32_Input_Value, 0);     // АВДУ1
-//                  MODULE_BZK_TX.bl_X6_3_IN = EPRO_Test_Bit(ui32_Input_Value, 1);     // АВДУ2
-//                  MODULE_BZK_TX.bl_X6_5_IN = EPRO_Test_Bit(ui32_Input_Value, 2);     // КМ7
-//                  MODULE_BZK_TX.bl_X6_6_IN = EPRO_Test_Bit(ui32_Input_Value, 3);     // КМ8
-//                  MODULE_BZK_TX.bl_X6_10_IN = EPRO_Test_Bit(ui32_Input_Value, 4);    // ППН1
-//                  MODULE_BZK_TX.bl_X6_11_IN = EPRO_Test_Bit(ui32_Input_Value, 5);    // ППН2
-//                  MODULE_BZK_TX.bl_X6_12_IN = EPRO_Test_Bit(ui32_Input_Value, 6);    // ППН3
-//                  MODULE_BZK_TX.bl_X5_11_IN = EPRO_Test_Bit(ui32_Input_Value, 7);    // QF1
-//                  MODULE_BZK_TX.bl_X5_12_IN = EPRO_Test_Bit(ui32_Input_Value, 8);    // QF2
-//                  MODULE_BZK_TX.bl_X5_13_IN = EPRO_Test_Bit(ui32_Input_Value, 9);    // QF3
-//                  MODULE_BZK_TX.bl_X5_14_IN = EPRO_Test_Bit(ui32_Input_Value, 10);   // QF4
-//                  MODULE_BZK_TX.bl_X2_4_OUT = bl_Output_Value[4U];                   // KM7
-//                  MODULE_BZK_TX.bl_X2_2_OUT = bl_Output_Value[5U];                   // KM8
-//                  MODULE_BZK_TX.bl_X3_9_OUT = bl_Output_Value[6U];                   // резерв
-//                  MODULE_BZK_TX.bl_X3_10_OUT = bl_Output_Value[7U];                  // KM3
-//                  MODULE_BZK_TX.bl_X3_7_OUT = bl_Output_Value[8U];                   // KM4
-//                  MODULE_BZK_TX.bl_X3_8_OUT = bl_Output_Value[9U];                   // KM5
-//                  MODULE_BZK_TX.bl_X3_3_OUT = bl_Output_Value[10U];                  // KM6
-//                  MODULE_BZK_TX.bl_X3_1_OUT = bl_Output_Value[11U];                  // KM1
-//                  MODULE_BZK_TX.bl_X2_9_OUT = bl_Output_Value[12U];                  // KL1
-//                  MODULE_BZK_TX.bl_X2_10_OUT = bl_Output_Value[13U];                 // KL2
-//                  MODULE_BZK_TX.bl_X2_8_OUT = bl_Output_Value[14U];                  // KL3
-//                  MODULE_BZK_TX.bl_X2_7_OUT = bl_Output_Value[15U];                  // KL4
+      MODULE_BZK_TX.bl_XP2_9_IN = EPRO_Test_Bit(ui32_Input_Value, 0);     // АВДУ1
+      MODULE_BZK_TX.bl_XP2_10_IN = EPRO_Test_Bit(ui32_Input_Value, 1);    // АВДУ2
+      MODULE_BZK_TX.bl_XP2_7_IN = EPRO_Test_Bit(ui32_Input_Value, 2);     // КМ7
+      MODULE_BZK_TX.bl_XP2_8_IN = EPRO_Test_Bit(ui32_Input_Value, 3);     // КМ8
+      MODULE_BZK_TX.bl_XP11_1_IN = EPRO_Test_Bit(ui32_Input_Value, 4);    // ППН1
+      MODULE_BZK_TX.bl_XP11_2_IN = EPRO_Test_Bit(ui32_Input_Value, 5);    // ППН2
+      MODULE_BZK_TX.bl_XP11_3_IN = EPRO_Test_Bit(ui32_Input_Value, 6);    // ППН3
+      MODULE_BZK_TX.bl_XP9_11_IN = EPRO_Test_Bit(ui32_Input_Value, 7);    // QF1
+      MODULE_BZK_TX.bl_XP9_12_IN = EPRO_Test_Bit(ui32_Input_Value, 8);    // QF2
+      MODULE_BZK_TX.bl_XP9_13_IN = EPRO_Test_Bit(ui32_Input_Value, 9);    // QF3
+      MODULE_BZK_TX.bl_XP9_14_IN = EPRO_Test_Bit(ui32_Input_Value, 10);   // QF4
+      MODULE_BZK_TX.bl_XP4_7_OUT = bl_Output_Value[4U];                   // KM7
+      MODULE_BZK_TX.bl_XP4_8_OUT = bl_Output_Value[5U];                   // KM8
+      MODULE_BZK_TX.bl_XP4_2_OUT = bl_Output_Value[6U];                   // KM2
+      MODULE_BZK_TX.bl_XP4_3_OUT = bl_Output_Value[7U];                   // KM3
+      MODULE_BZK_TX.bl_XP4_4_OUT = bl_Output_Value[8U];                   // KM4
+      MODULE_BZK_TX.bl_XP4_5_OUT = bl_Output_Value[9U];                   // KM5
+      MODULE_BZK_TX.bl_XP4_6_OUT = bl_Output_Value[10U];                  // KM6
+      MODULE_BZK_TX.bl_XP4_1_OUT = bl_Output_Value[11U];                  // KM1
+      MODULE_BZK_TX.bl_XP4_9_OUT = bl_Output_Value[12U];                  // KL1
+      MODULE_BZK_TX.bl_XP4_10_OUT = bl_Output_Value[13U];                 // KL2
+      MODULE_BZK_TX.bl_XP4_11_OUT = bl_Output_Value[14U];                 // KL3
+      MODULE_BZK_TX.bl_XP4_12_OUT = bl_Output_Value[15U];                 // KL4
 
-                 MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
-
-
+     MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
 
 
-                if (bl_TIMER_LED)
-                  {
-                    switch (ui8_Index_LED)
-                    {
-                      case 0:
-                        if (bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        if (bl_Warning_LED || bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      case 1:
-                        if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        }
-                        if (bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      case 2:
-                        if (bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        }
-                        if (bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      case 3:
-                        if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        }
-                        if (bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      case 4:
-                        if (bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        }
-                        if (bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      case 5:
-                        if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        }
-                        if (bl_BusOff_LED || bl_TP_Init_End)
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-                        }
-                        else
-                        {
-                          HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        }
-                        break;
-                      default:
-                        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
-                        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-                        break;
-                    }
 
-                     ui8_Index_LED++;
-                     if (ui8_Index_LED > 5)
-                     {
-                       ui8_Index_LED = 0;
-                     }
-                   }
+
+    if (bl_TIMER_LED)
+      {
+        switch (ui8_Index_LED)
+        {
+          case 0:
+            if (bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            if (bl_Warning_LED || bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          case 1:
+            if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            }
+            if (bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          case 2:
+            if (bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            }
+            if (bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          case 3:
+            if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            }
+            if (bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          case 4:
+            if (bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            }
+            if (bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          case 5:
+            if (bl_PreoperationalMode_LED || bl_Operational || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            }
+            if (bl_BusOff_LED || bl_TP_Init_End)
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+            else
+            {
+              HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            break;
+          default:
+            HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            break;
+        }
+
+         ui8_Index_LED++;
+         if (ui8_Index_LED > 5)
+         {
+           ui8_Index_LED = 0;
+         }
+       }
 
 
     /* USER CODE END WHILE */

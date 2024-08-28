@@ -147,49 +147,49 @@ void MODULE_BZK_TX_MANAGER(bool_t bl_Enable, CAN_BUFFER_TX_t* CAN_BUFFER_TX)
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_DLC = 8;
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = (
-          INT_TO_UINT8(MODULE_BZK_TX.bl_X6_1_IN) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_3_IN), 2) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_5_IN), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_6_IN), 5)
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_9_IN) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_10_IN), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_7_IN), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_8_IN), 5)
       );
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = (
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_10_IN), 1) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_11_IN), 2) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_12_IN), 3) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_11_IN), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_12_IN), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_13_IN), 6) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_14_IN), 7)
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_1_IN), 1) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_2_IN), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_3_IN), 3) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_11_IN), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_12_IN), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_13_IN), 6) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_14_IN), 7)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = (
-          INT_TO_UINT8(MODULE_BZK_TX.bl_X2_4_OUT) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_2_OUT), 1) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_9_OUT), 2) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_10_OUT), 3) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_7_OUT), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_8_OUT), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_3_OUT), 6)
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_7_OUT) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_8_OUT), 1) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_2_OUT), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_3_OUT), 3) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_4_OUT), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_5_OUT), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_6_OUT), 6)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = (
-          INT_TO_UINT8(MODULE_BZK_TX.bl_X3_1_OUT) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_9_OUT), 2) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_10_OUT), 3) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_8_OUT), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_7_OUT), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X4_1_X4_3_OUT), 6)
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_1_OUT) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_9_OUT), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_10_OUT), 3) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_11_OUT), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_12_OUT), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP10_2_OUT), 6)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = (
-          INT_TO_UINT8(MODULE_BZK_TX.bl_X5_3_OUT) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_4_OUT), 1) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_5_OUT), 2) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_6_OUT), 3) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_7_OUT), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_8_OUT), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_9_OUT), 6) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_10_OUT), 7)
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_3_OUT) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_4_OUT), 1) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_5_OUT), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_6_OUT), 3) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_7_OUT), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_8_OUT), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_9_OUT), 6) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_10_OUT), 7)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0xFF;
