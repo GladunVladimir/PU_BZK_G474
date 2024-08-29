@@ -97,13 +97,13 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui32_ID = (CAN_MESSAGE_RX->ui32_ID);
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_DLC = 8;
 
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = INT_TO_UINT8(SHR(PROJECT_DATA, 8) & 0x000000FF); // Месяц выпуска прошивки?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = INT_TO_UINT8(PROJECT_DATA & 0x000000FF); // День выпуска прошивки?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = INT_TO_UINT8(EPRO_BCD2TOBYTE(SHR(PROJECT_DATA, 16) & 0x000000FF)); // Год выпуска прошивки?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = 0x00; // Час выпуска прошивки?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = 0x00; // Минута выпуска прошивки?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0x67; // Аппаратная версия платы?
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[6U] = 0x34; //CRC ID процессора?
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = INT_TO_UINT8(SHR(PROJECT_DATA, 8) & 0x000000FF); // Месяц выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = INT_TO_UINT8(PROJECT_DATA & 0x000000FF); // День выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = INT_TO_UINT8(EPRO_BCD2TOBYTE(SHR(PROJECT_DATA, 16) & 0x000000FF)); // Год выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = 0x00; // Час выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = 0x00; // Минута выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0x67; // Аппаратная версия платы
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[6U] = 0x34; //CRC ID процессора
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[7U] = 0x74; //
 
                CAN_BUFFER_TX->ui16_Buffer_End = (CAN_BUFFER_TX->ui16_Buffer_End + 1);
@@ -203,81 +203,4 @@ void MODULE_BZK_TX_MANAGER(bool_t bl_Enable, CAN_BUFFER_TX_t* CAN_BUFFER_TX)
       }
     }
   }
-
-//  if (bl_Enable)
-//    {
-//      // i16_Index - количество ячеек в буфере доступных для отправки.
-//      // (PROJECT_CAN_BUFFER_TX_SIZE - 1) <= одна ячейка в буфере остаётся не доступной для отправки, что бы после записи (ui16_Buffer_End != ui16_Buffer_Start).
-//      if (CAN_BUFFER_TX->ui16_Buffer_End >= CAN_BUFFER_TX->ui16_Buffer_Start)
-//      {
-//        i16_Index = (PROJECT_CAN_BUFFER_TX_SIZE - 1 - (CAN_BUFFER_TX->ui16_Buffer_End - CAN_BUFFER_TX->ui16_Buffer_Start));
-//      }
-//      else
-//      {
-//        i16_Index = (PROJECT_CAN_BUFFER_TX_SIZE - 1 - (CAN_BUFFER_TX->ui16_Buffer_End - CAN_BUFFER_TX->ui16_Buffer_Start + PROJECT_CAN_BUFFER_TX_SIZE));
-//      }
-//      if (i16_Index >= 1)
-//      {
-//        CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].bl_RTR = FALSE;
-//        CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].bl_IDE = TRUE;
-//        CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui32_ID = 0x00006801UL;
-//        CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_DLC = 8; //
-//
-//        CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = (
-//                INT_TO_UINT8(MODULE_BZK_TX.bl_X6_1_IN) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_3_IN), 2) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_5_IN), 4) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_6_IN), 5)
-//            );
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = (
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_10_IN), 1) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_11_IN), 2) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X6_12_IN), 3) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_11_IN), 4) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_12_IN), 5) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_13_IN), 6) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_14_IN), 7)
-//            );
-//
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = (
-//                INT_TO_UINT8(MODULE_BZK_TX.bl_X2_4_OUT) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_2_OUT), 1) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_9_OUT), 2) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_10_OUT), 3) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_7_OUT), 4) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_8_OUT), 5) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X3_3_OUT), 6)
-//            );
-//
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = (
-//                INT_TO_UINT8(MODULE_BZK_TX.bl_X3_1_OUT) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_9_OUT), 2) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_10_OUT), 3) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_8_OUT), 4) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X2_7_OUT), 5) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X4_1_X4_3_OUT), 6)
-//            );
-//
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = (
-//                INT_TO_UINT8(MODULE_BZK_TX.bl_X5_3_OUT) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_4_OUT), 1) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_5_OUT), 2) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_6_OUT), 3) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_7_OUT), 4) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_8_OUT), 5) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_9_OUT), 6) |
-//                SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_X5_10_OUT), 7)
-//            );
-//
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0xFF;
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[6U] = 0xFF;
-//            CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[7U] = 0xFF;
-//
-//        CAN_BUFFER_TX->ui16_Buffer_End = (CAN_BUFFER_TX->ui16_Buffer_End + 1);
-//        if (CAN_BUFFER_TX->ui16_Buffer_End >= PROJECT_CAN_BUFFER_TX_SIZE)
-//        {
-//          CAN_BUFFER_TX->ui16_Buffer_End = 0;
-//        }
-//      }
-//    }
 }

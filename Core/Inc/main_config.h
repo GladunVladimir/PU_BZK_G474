@@ -27,7 +27,7 @@ extern "C" {
   // Версия программного обеспечения
 #define PROJECT_DATA                                      0x20240827// 0x20230912 // Дата создания текущей версии проекта
 //#define PROJECT_DATA                                      0x00180503
-#define PROJECT_ID                                        673U      // Идентификатор проекта
+#define PROJECT_ID                                        692U      // Идентификатор проекта
 #define PROJECT_VERSION                                   0U        //0U // Версия проекта
 
 #define LED_GREEN_PIN_SET                                 GPIO_PIN_RESET
