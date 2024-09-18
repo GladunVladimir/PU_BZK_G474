@@ -39,7 +39,6 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
         )
 
         {
-
           MODULE_BZK_RX.ui8_CAN_Message_Counter = (MODULE_BZK_RX.ui8_CAN_Message_Counter + 1);
 
           //DATA 0
@@ -47,7 +46,6 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
           MODULE_BZK_RX.bl_QF2 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[0U], 1);
           MODULE_BZK_RX.bl_QF3 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[0U], 2);
           MODULE_BZK_RX.bl_QF4 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[0U], 3);
-
 
 
           //DATA 1
@@ -60,7 +58,7 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
           MODULE_BZK_RX.bl_KM6 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 6);
 
 
-          //DATA2
+          //DATA 2
           MODULE_BZK_RX.bl_KM1 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 0);
           MODULE_BZK_RX.bl_KL1 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 4);
           MODULE_BZK_RX.bl_KL2 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 5);
@@ -77,7 +75,6 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
                ) &&
                (CAN_MESSAGE_RX->bl_RTR)
            )
-
 
            {
              // i16_Index - количество ячеек в буфере доступных для отправки.
@@ -99,7 +96,7 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
 
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = INT_TO_UINT8(SHR(PROJECT_DATA, 8) & 0x000000FF); // Месяц выпуска прошивки
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = INT_TO_UINT8(PROJECT_DATA & 0x000000FF); // День выпуска прошивки
-               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = INT_TO_UINT8(EPRO_BCD2TOBYTE(SHR(PROJECT_DATA, 16) & 0x000000FF)); // Год выпуска прошивки
+               CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[2U] = INT_TO_UINT8((SHR(PROJECT_DATA, 16) & 0x000000FF)); // Год выпуска прошивки
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = 0x00; // Час выпуска прошивки
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = 0x00; // Минута выпуска прошивки
                CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0x67; // Аппаратная версия платы
@@ -111,13 +108,13 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
                {
                  CAN_BUFFER_TX->ui16_Buffer_End = 0;
                }
-             }
+              }
 
-              return FALSE;
+               return FALSE;
             }
-          }
-          return TRUE;
-        }
+   }
+  return TRUE;
+}
 
 /******************************************************************************
  * Function Name: MODULE_BZK_TX_MANAGER
