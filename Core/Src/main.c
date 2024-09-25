@@ -103,7 +103,7 @@ CAN_BUFFER_TX_t CANTxBuffer[3U];
 FDCAN_FilterTypeDef FDCANFilterConfig;
 
 /* Массивы данных комманд*/
-static uint32_t ui32_Input_Value;
+static uint32_t ui32_Input_Value_1, ui32_Input_Value_2;
 static bool_t bl_Output_Value[64U];
 
 /* Блок переменных таймеров*/
@@ -806,10 +806,10 @@ void Modbus_Poll_USB(void)
       ui16_Modbus_Holding_Registers_Data_USB[20U] = ((SHL(ui8_StringSerial[2U], 8) & 0xFF00) | ui8_StringSerial[4U]);
       ui16_Modbus_Holding_Registers_Data_USB[21U] = INT_TO_UINT16(SHR(READ_REG(hfdcan1.Instance->ECR), 0) & 0x0000FFFF); // Сдвиг для G47* не требуется
       ui16_Modbus_Holding_Registers_Data_USB[22U] = (SHL(ui8_Modbus_Slave_CRC_Error_USB, 8));
-      ui16_Modbus_Holding_Registers_Data_USB[23U] = INT_TO_UINT16(ui32_Input_Value & 0x0000FFFF);
-      ui16_Modbus_Holding_Registers_Data_USB[24U] = INT_TO_UINT16(SHR(ui32_Input_Value, 16) & 0x0000FFFF);
-      ui16_Modbus_Holding_Registers_Data_USB[25U] = 0;
-      ui16_Modbus_Holding_Registers_Data_USB[26U] = 0;
+      ui16_Modbus_Holding_Registers_Data_USB[23U] = INT_TO_UINT16(ui32_Input_Value_1 & 0x0000FFFF);
+      ui16_Modbus_Holding_Registers_Data_USB[24U] = INT_TO_UINT16(SHR(ui32_Input_Value_1, 16) & 0x0000FFFF);
+      ui16_Modbus_Holding_Registers_Data_USB[25U] = INT_TO_UINT16(ui32_Input_Value_2 & 0x0000FFFF);
+      ui16_Modbus_Holding_Registers_Data_USB[26U] = INT_TO_UINT16(SHR(ui32_Input_Value_2, 16) & 0x0000FFFF);
       ui16_Modbus_Holding_Registers_Data_USB[27U] = (
           SHL(bl_Output_Value[0U], 0) |
           SHL(bl_Output_Value[1U], 1) |
@@ -911,10 +911,10 @@ void Modbus_Poll_USB(void)
  ******************************************************************************/
 void UpdateDriverStates()
 {
-  Drivers[0].bl_State = EPRO_Test_Bit(ui32_Input_Value, 7);
-  Drivers[1].bl_State = EPRO_Test_Bit(ui32_Input_Value, 8);
-  Drivers[2].bl_State = EPRO_Test_Bit(ui32_Input_Value, 9);
-  Drivers[3].bl_State = EPRO_Test_Bit(ui32_Input_Value, 10);
+  Drivers[0].bl_State = EPRO_Test_Bit(ui32_Input_Value_2, 16);
+  Drivers[1].bl_State = EPRO_Test_Bit(ui32_Input_Value_2, 17);
+  Drivers[2].bl_State = EPRO_Test_Bit(ui32_Input_Value_2, 18);
+  Drivers[3].bl_State = EPRO_Test_Bit(ui32_Input_Value_2, 19);
 }
 
 /******************************************************************************
@@ -923,7 +923,7 @@ void UpdateDriverStates()
  ******************************************************************************/
 void EnableProtection()
 {
-  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, TRUE); //
+  HAL_GPIO_WritePin(OUT_D_25_GPIO_Port, OUT_D_25_Pin, TRUE);
   MODULE_BZK_TX.bl_XP10_2_OUT = TRUE;
 }
 
@@ -1565,18 +1565,22 @@ int main(void)
         bl_Output_Value[1U] = MODULE_BZK_RX.bl_QF2;
         bl_Output_Value[2U] = MODULE_BZK_RX.bl_QF3;
         bl_Output_Value[3U] = MODULE_BZK_RX.bl_QF4;
-        bl_Output_Value[4U] = MODULE_BZK_RX.bl_KM7;
-        bl_Output_Value[5U] = MODULE_BZK_RX.bl_KM8;
-        bl_Output_Value[6U] = MODULE_BZK_RX.bl_KM2;
-        bl_Output_Value[7U] = MODULE_BZK_RX.bl_KM3;
-        bl_Output_Value[8U] = MODULE_BZK_RX.bl_KM4;
-        bl_Output_Value[9U] = MODULE_BZK_RX.bl_KM5;
-        bl_Output_Value[10U] = MODULE_BZK_RX.bl_KM6;
-        bl_Output_Value[11U] = MODULE_BZK_RX.bl_KM1;
-        bl_Output_Value[12U] = MODULE_BZK_RX.bl_KL1;
-        bl_Output_Value[13U] = MODULE_BZK_RX.bl_KL2;
-        bl_Output_Value[14U] = MODULE_BZK_RX.bl_KL3;
-        bl_Output_Value[15U] = MODULE_BZK_RX.bl_KL4;
+        bl_Output_Value[10U] = MODULE_BZK_RX.bl_XP4_1_OUT;
+        bl_Output_Value[11U] = MODULE_BZK_RX.bl_XP4_2_OUT;
+        bl_Output_Value[12U] = MODULE_BZK_RX.bl_XP4_3_OUT;
+        bl_Output_Value[13U] = MODULE_BZK_RX.bl_XP4_4_OUT;
+        bl_Output_Value[14U] = MODULE_BZK_RX.bl_XP4_5_OUT;
+        bl_Output_Value[15U] = MODULE_BZK_RX.bl_XP4_6_OUT;
+        bl_Output_Value[16U] = MODULE_BZK_RX.bl_XP4_7_OUT;
+        bl_Output_Value[17U] = MODULE_BZK_RX.bl_XP4_8_OUT;
+        bl_Output_Value[18U] = MODULE_BZK_RX.bl_XP4_9_OUT;
+        bl_Output_Value[19U] = MODULE_BZK_RX.bl_XP4_10_OUT;
+        bl_Output_Value[20U] = MODULE_BZK_RX.bl_XP4_11_OUT;
+        bl_Output_Value[21U] = MODULE_BZK_RX.bl_XP4_12_OUT;
+        bl_Output_Value[22U] = MODULE_BZK_RX.bl_XP7_1_OUT;
+        bl_Output_Value[23U] = MODULE_BZK_RX.bl_XP7_2_OUT;
+        bl_Output_Value[24U] = MODULE_BZK_RX.bl_XP8_1_OUT;
+        bl_Output_Value[25U] = MODULE_BZK_RX.bl_XP8_2_OUT;
 
 
         CANRxBuffer[ui16_CANIndex].ui16_Buffer_Start = (CANRxBuffer[ui16_CANIndex].ui16_Buffer_Start + 1);
@@ -1642,19 +1646,22 @@ int main(void)
       bl_Output_Value[1U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 1);   // QF2 Вкл.
       bl_Output_Value[2U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 2);   // QF3 Вкл.
       bl_Output_Value[3U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 3);   // QF4 Вкл.
-      bl_Output_Value[4U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 4);   // КМ7 Вкл.
-      bl_Output_Value[5U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 5);   // КМ8 Вкл.
-      bl_Output_Value[6U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 6);   // КМ2 Вкл.
-      bl_Output_Value[7U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 7);   // КМ3 Вкл.
-      bl_Output_Value[8U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 8);   // КМ4 Вкл.
-      bl_Output_Value[9U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 9);   // КМ5 Вкл.
-      bl_Output_Value[10U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 10); // КМ6 Вкл.
-      bl_Output_Value[11U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 11); // КМ1 Вкл.
-      bl_Output_Value[12U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 12); // КL1 Вкл. (0 сек.)
-      bl_Output_Value[13U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 13); // КL2 Вкл. (5 сек.)
-      bl_Output_Value[14U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 14); // КL3 Вкл. (0 сек.)
-      bl_Output_Value[15U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 15); // КL4 Вкл. (5 сек.)
-
+      bl_Output_Value[10U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 10); // КМ1 Вкл.
+      bl_Output_Value[11U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 11); // КМ2 Вкл.
+      bl_Output_Value[12U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 12); // КМ3 Вкл.
+      bl_Output_Value[13U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 13); // КМ4 Вкл.
+      bl_Output_Value[14U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 14); // КМ5 Вкл.
+      bl_Output_Value[15U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 15); // КМ6 Вкл.
+      bl_Output_Value[16U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 16); // КМ7 Вкл.
+      bl_Output_Value[17U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 17); // КМ8 Вкл.
+      bl_Output_Value[18U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 18); // КL1 Вкл. (0 сек.)
+      bl_Output_Value[19U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 19); // КL2 Вкл. (5 сек.)
+      bl_Output_Value[20U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 20); // КL3 Вкл. (0 сек.)
+      bl_Output_Value[21U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 21); // КL4 Вкл. (5 сек.)
+      bl_Output_Value[22U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 22);
+      bl_Output_Value[23U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 23);
+      bl_Output_Value[24U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 24);
+      bl_Output_Value[25U] = EPRO_Test_Bit(ui16_Modbus_Holding_Registers_Data_USB[0U], 25);
     }
 
     // При возврате к управлению по CAN
@@ -1673,61 +1680,120 @@ int main(void)
 #endif
 
     // Задаём состояние дискретных выходов
-    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[11U]);   // KM1
-    HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[6U]);    // KM2
-    HAL_GPIO_WritePin(OUT_D_3_GPIO_Port, OUT_D_3_Pin, bl_Output_Value[7U]);    // KM3
-    HAL_GPIO_WritePin(OUT_D_4_GPIO_Port, OUT_D_4_Pin, bl_Output_Value[8U]);    // KM4
-    HAL_GPIO_WritePin(OUT_D_5_GPIO_Port, OUT_D_5_Pin, bl_Output_Value[9U]);    // KM5
-    HAL_GPIO_WritePin(OUT_D_6_GPIO_Port, OUT_D_6_Pin, bl_Output_Value[10U]);   // KM6
-    HAL_GPIO_WritePin(OUT_D_7_GPIO_Port, OUT_D_7_Pin, bl_Output_Value[4U]);    // KM7
-    HAL_GPIO_WritePin(OUT_D_8_GPIO_Port, OUT_D_8_Pin, bl_Output_Value[5U]);    // KM8
-    HAL_GPIO_WritePin(OUT_D_9_GPIO_Port, OUT_D_9_Pin, bl_Output_Value[12U]);   // KL1
-    HAL_GPIO_WritePin(OUT_D_10_GPIO_Port, OUT_D_10_Pin, bl_Output_Value[13U]); // KL2
-    HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[14U]); // KL3
-    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[15U]); // KL4
+    HAL_GPIO_WritePin(OUT_D_1_GPIO_Port, OUT_D_1_Pin, bl_Output_Value[10U]);    // KM1
+    HAL_GPIO_WritePin(OUT_D_2_GPIO_Port, OUT_D_2_Pin, bl_Output_Value[11U]);    // KM2
+    HAL_GPIO_WritePin(OUT_D_3_GPIO_Port, OUT_D_3_Pin, bl_Output_Value[12U]);    // KM3
+    HAL_GPIO_WritePin(OUT_D_4_GPIO_Port, OUT_D_4_Pin, bl_Output_Value[13U]);    // KM4
+    HAL_GPIO_WritePin(OUT_D_5_GPIO_Port, OUT_D_5_Pin, bl_Output_Value[14U]);    // KM5
+    HAL_GPIO_WritePin(OUT_D_6_GPIO_Port, OUT_D_6_Pin, bl_Output_Value[15U]);    // KM6
+    HAL_GPIO_WritePin(OUT_D_7_GPIO_Port, OUT_D_7_Pin, bl_Output_Value[16U]);    // KM7
+    HAL_GPIO_WritePin(OUT_D_8_GPIO_Port, OUT_D_8_Pin, bl_Output_Value[17U]);    // KM8
+    HAL_GPIO_WritePin(OUT_D_9_GPIO_Port, OUT_D_9_Pin, bl_Output_Value[18U]);    // KL1
+    HAL_GPIO_WritePin(OUT_D_10_GPIO_Port, OUT_D_10_Pin, bl_Output_Value[19U]);  // KL2
+    HAL_GPIO_WritePin(OUT_D_11_GPIO_Port, OUT_D_11_Pin, bl_Output_Value[20U]);  // KL3
+    HAL_GPIO_WritePin(OUT_D_12_GPIO_Port, OUT_D_12_Pin, bl_Output_Value[21U]);  // KL4
+    HAL_GPIO_WritePin(OUT_D_13_GPIO_Port, OUT_D_13_Pin, bl_Output_Value[22U]);
+    HAL_GPIO_WritePin(OUT_D_14_GPIO_Port, OUT_D_14_Pin, bl_Output_Value[23U]);
+    HAL_GPIO_WritePin(OUT_D_15_GPIO_Port, OUT_D_15_Pin, bl_Output_Value[24U]);
+    HAL_GPIO_WritePin(OUT_D_16_GPIO_Port, OUT_D_16_Pin, bl_Output_Value[25U]);
 
     // Считываем состояние дискретных входов
-    ui32_Input_Value =
+    ui32_Input_Value_1 =
         (
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 0) |    // Инд. АВДУ1
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 1) |  // Инд. АВДУ2
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 2) |    // Инд. КМ7
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 3) |    // Инд. КМ8
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 4) |  // АВ ППН1
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 5) |  // АВ ППН2
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 6) |  // АВ ППН3
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 7) |  // Инд. QF1
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 8) |  // Инд. QF2
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 9) | // Инд. QF3
-            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 10)   // Инд. QF4
+            SHL(INT_TO_UINT32(bl_Output_Value[10U]), 10) |
+            SHL(INT_TO_UINT32(bl_Output_Value[11U]), 11) |
+            SHL(INT_TO_UINT32(bl_Output_Value[12U]), 12) |
+            SHL(INT_TO_UINT32(bl_Output_Value[13U]), 13) |
+            SHL(INT_TO_UINT32(bl_Output_Value[14U]), 14) |
+            SHL(INT_TO_UINT32(bl_Output_Value[15U]), 15) |
+            SHL(INT_TO_UINT32(bl_Output_Value[16U]), 16) |
+            SHL(INT_TO_UINT32(bl_Output_Value[17U]), 17) |
+            SHL(INT_TO_UINT32(bl_Output_Value[18U]), 18) |
+            SHL(INT_TO_UINT32(bl_Output_Value[19U]), 19) |
+            SHL(INT_TO_UINT32(bl_Output_Value[20U]), 20) |
+            SHL(INT_TO_UINT32(bl_Output_Value[21U]), 21) |
+            SHL(INT_TO_UINT32(bl_Output_Value[22U]), 22) |
+            SHL(INT_TO_UINT32(bl_Output_Value[23U]), 23) |
+            SHL(INT_TO_UINT32(bl_Output_Value[24U]), 24) |
+            SHL(INT_TO_UINT32(bl_Output_Value[25U]), 25)
         );
+    ui32_Input_Value_2 =
+        (
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_1_GPIO_Port, IN_D_1_Pin)), 0) |    // XP2:3 32 COM
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_2_GPIO_Port, IN_D_2_Pin)), 1) |    // XP 33 Инд. KM2
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_3_GPIO_Port, IN_D_3_Pin)), 2) |    // Инд. КМ3
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_4_GPIO_Port, IN_D_4_Pin)), 3) |    // Инд. КМ4
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_5_GPIO_Port, IN_D_5_Pin)), 4) |    // Инд. КМ5
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_6_GPIO_Port, IN_D_6_Pin)), 5) |    //37 Инд. КМ6
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_7_GPIO_Port, IN_D_7_Pin)), 6) |    // Инд. КМ7
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_8_GPIO_Port, IN_D_8_Pin)), 7) |    // Инд. КМ8
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_9_GPIO_Port, IN_D_9_Pin)), 8) |    // Инд. АВДУ1
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_10_GPIO_Port, IN_D_10_Pin)), 9) |  // Инд. АВДУ2
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_11_GPIO_Port, IN_D_11_Pin)), 10) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_12_GPIO_Port, IN_D_12_Pin)), 11) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_13_GPIO_Port, IN_D_13_Pin)), 12) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_14_GPIO_Port, IN_D_14_Pin)), 13) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_15_GPIO_Port, IN_D_15_Pin)), 14) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_16_GPIO_Port, IN_D_16_Pin)), 15) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_17_GPIO_Port, IN_D_17_Pin)), 16) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_18_GPIO_Port, IN_D_18_Pin)), 17) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_19_GPIO_Port, IN_D_19_Pin)), 18) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_20_GPIO_Port, IN_D_20_Pin)), 19) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_21_GPIO_Port, IN_D_21_Pin)), 20) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_22_GPIO_Port, IN_D_22_Pin)), 21) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_23_GPIO_Port, IN_D_23_Pin)), 22) |
+            SHL(INT_TO_UINT32(!HAL_GPIO_ReadPin(IN_D_24_GPIO_Port, IN_D_24_Pin)), 23)
+        );
+
+
 
 
     ProcessDrivers(ui32_currentTime);
 
-    MODULE_BZK_TX.bl_XP2_9_IN = EPRO_Test_Bit(ui32_Input_Value, 0);     // АВДУ1
-    MODULE_BZK_TX.bl_XP2_10_IN = EPRO_Test_Bit(ui32_Input_Value, 1);    // АВДУ2
-    MODULE_BZK_TX.bl_XP2_7_IN = EPRO_Test_Bit(ui32_Input_Value, 2);     // КМ7
-    MODULE_BZK_TX.bl_XP2_8_IN = EPRO_Test_Bit(ui32_Input_Value, 3);     // КМ8
-    MODULE_BZK_TX.bl_XP11_1_IN = EPRO_Test_Bit(ui32_Input_Value, 4);    // ППН1
-    MODULE_BZK_TX.bl_XP11_2_IN = EPRO_Test_Bit(ui32_Input_Value, 5);    // ППН2
-    MODULE_BZK_TX.bl_XP11_3_IN = EPRO_Test_Bit(ui32_Input_Value, 6);    // ППН3
-    MODULE_BZK_TX.bl_XP9_11_IN = EPRO_Test_Bit(ui32_Input_Value, 7);    // QF1
-    MODULE_BZK_TX.bl_XP9_12_IN = EPRO_Test_Bit(ui32_Input_Value, 8);    // QF2
-    MODULE_BZK_TX.bl_XP9_13_IN = EPRO_Test_Bit(ui32_Input_Value, 9);    // QF3
-    MODULE_BZK_TX.bl_XP9_14_IN = EPRO_Test_Bit(ui32_Input_Value, 10);   // QF4
-    MODULE_BZK_TX.bl_XP4_7_OUT = bl_Output_Value[4U];                   // KM7
-    MODULE_BZK_TX.bl_XP4_8_OUT = bl_Output_Value[5U];                   // KM8
-    MODULE_BZK_TX.bl_XP4_2_OUT = bl_Output_Value[6U];                   // KM2
-    MODULE_BZK_TX.bl_XP4_3_OUT = bl_Output_Value[7U];                   // KM3
-    MODULE_BZK_TX.bl_XP4_4_OUT = bl_Output_Value[8U];                   // KM4
-    MODULE_BZK_TX.bl_XP4_5_OUT = bl_Output_Value[9U];                   // KM5
-    MODULE_BZK_TX.bl_XP4_6_OUT = bl_Output_Value[10U];                  // KM6
-    MODULE_BZK_TX.bl_XP4_1_OUT = bl_Output_Value[11U];                  // KM1
-    MODULE_BZK_TX.bl_XP4_9_OUT = bl_Output_Value[12U];                  // KL1
-    MODULE_BZK_TX.bl_XP4_10_OUT = bl_Output_Value[13U];                 // KL2
-    MODULE_BZK_TX.bl_XP4_11_OUT = bl_Output_Value[14U];                 // KL3
-    MODULE_BZK_TX.bl_XP4_12_OUT = bl_Output_Value[15U];                 // KL4
+
+    MODULE_BZK_TX.bl_XP4_1_OUT = bl_Output_Value[10U];   // KM1
+    MODULE_BZK_TX.bl_XP4_2_OUT = bl_Output_Value[11U];   // KM2
+    MODULE_BZK_TX.bl_XP4_3_OUT = bl_Output_Value[12U];   // KM3
+    MODULE_BZK_TX.bl_XP4_4_OUT = bl_Output_Value[13U];   // KM4
+    MODULE_BZK_TX.bl_XP4_5_OUT = bl_Output_Value[14U];   // KM5
+    MODULE_BZK_TX.bl_XP4_6_OUT = bl_Output_Value[15U];   // KM6
+    MODULE_BZK_TX.bl_XP4_7_OUT = bl_Output_Value[16U];   // KM7
+    MODULE_BZK_TX.bl_XP4_8_OUT = bl_Output_Value[17U];   // KM8
+    MODULE_BZK_TX.bl_XP4_9_OUT = bl_Output_Value[18U];   // KL1
+    MODULE_BZK_TX.bl_XP4_10_OUT = bl_Output_Value[19U];  // KL2
+    MODULE_BZK_TX.bl_XP4_11_OUT = bl_Output_Value[20U];  // KL3
+    MODULE_BZK_TX.bl_XP4_12_OUT = bl_Output_Value[21U];  // KL4
+    MODULE_BZK_TX.bl_XP7_1_OUT = bl_Output_Value[22U];
+    MODULE_BZK_TX.bl_XP7_2_OUT = bl_Output_Value[23U];
+    MODULE_BZK_TX.bl_XP8_1_OUT = bl_Output_Value[24U];
+    MODULE_BZK_TX.bl_XP8_2_OUT = bl_Output_Value[25U];
+
+    MODULE_BZK_TX.bl_XP2_1_IN = EPRO_Test_Bit(ui32_Input_Value_2, 0);
+    MODULE_BZK_TX.bl_XP2_2_IN = EPRO_Test_Bit(ui32_Input_Value_2, 1);
+    MODULE_BZK_TX.bl_XP2_3_IN = EPRO_Test_Bit(ui32_Input_Value_2, 2);
+    MODULE_BZK_TX.bl_XP2_4_IN = EPRO_Test_Bit(ui32_Input_Value_2, 3);
+    MODULE_BZK_TX.bl_XP2_5_IN = EPRO_Test_Bit(ui32_Input_Value_2, 4);
+    MODULE_BZK_TX.bl_XP2_6_IN = EPRO_Test_Bit(ui32_Input_Value_2, 5);
+    MODULE_BZK_TX.bl_XP2_7_IN = EPRO_Test_Bit(ui32_Input_Value_2, 6);
+    MODULE_BZK_TX.bl_XP2_8_IN = EPRO_Test_Bit(ui32_Input_Value_2, 7);
+    MODULE_BZK_TX.bl_XP2_9_IN = EPRO_Test_Bit(ui32_Input_Value_2, 8);
+    MODULE_BZK_TX.bl_XP2_10_IN = EPRO_Test_Bit(ui32_Input_Value_2, 9);
+    MODULE_BZK_TX.bl_XP7_3_IN = EPRO_Test_Bit(ui32_Input_Value_2, 10);
+    MODULE_BZK_TX.bl_XP7_4_IN = EPRO_Test_Bit(ui32_Input_Value_2, 11);
+    MODULE_BZK_TX.bl_XP7_6_IN = EPRO_Test_Bit(ui32_Input_Value_2, 12);
+    MODULE_BZK_TX.bl_XP8_3_IN = EPRO_Test_Bit(ui32_Input_Value_2, 13);
+    MODULE_BZK_TX.bl_XP8_4_IN = EPRO_Test_Bit(ui32_Input_Value_2, 14);
+    MODULE_BZK_TX.bl_XP8_6_IN = EPRO_Test_Bit(ui32_Input_Value_2, 15);
+    MODULE_BZK_TX.bl_XP9_11_IN = EPRO_Test_Bit(ui32_Input_Value_2, 16);
+    MODULE_BZK_TX.bl_XP9_12_IN = EPRO_Test_Bit(ui32_Input_Value_2, 17);
+    MODULE_BZK_TX.bl_XP9_13_IN = EPRO_Test_Bit(ui32_Input_Value_2, 18);
+    MODULE_BZK_TX.bl_XP9_14_IN = EPRO_Test_Bit(ui32_Input_Value_2, 19);
+    MODULE_BZK_TX.bl_XP11_1_IN = EPRO_Test_Bit(ui32_Input_Value_2, 20);
+    MODULE_BZK_TX.bl_XP11_2_IN = EPRO_Test_Bit(ui32_Input_Value_2, 21);
+    MODULE_BZK_TX.bl_XP11_3_IN = EPRO_Test_Bit(ui32_Input_Value_2, 22);
+    MODULE_BZK_TX.bl_XP11_4_IN = EPRO_Test_Bit(ui32_Input_Value_2, 23);
+
+
 
     MODULE_BZK_TX_MANAGER(bl_TIMER_CAN, &CANTxBuffer[0U]);
 

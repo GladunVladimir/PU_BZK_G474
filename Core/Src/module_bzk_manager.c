@@ -49,21 +49,25 @@ bool_t MODULE_BZK_RX_MANAGER(CAN_MESSAGE_t* CAN_MESSAGE_RX, CAN_BUFFER_TX_t* CAN
 
 
           //DATA 1
-          MODULE_BZK_RX.bl_KM7 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 0);
-          MODULE_BZK_RX.bl_KM8 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 1);
-          MODULE_BZK_RX.bl_KM2 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 2);
-          MODULE_BZK_RX.bl_KM3 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 3);
-          MODULE_BZK_RX.bl_KM4 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 4);
-          MODULE_BZK_RX.bl_KM5 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 5);
-          MODULE_BZK_RX.bl_KM6 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 6);
+          MODULE_BZK_RX.bl_XP4_7_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 0);
+          MODULE_BZK_RX.bl_XP4_8_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 1);
+          MODULE_BZK_RX.bl_XP4_2_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 2);
+          MODULE_BZK_RX.bl_XP4_3_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 3);
+          MODULE_BZK_RX.bl_XP4_4_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 4);
+          MODULE_BZK_RX.bl_XP4_5_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 5);
+          MODULE_BZK_RX.bl_XP4_6_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 6);
+          MODULE_BZK_RX.bl_XP8_1_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[1U], 7);
 
 
           //DATA 2
-          MODULE_BZK_RX.bl_KM1 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 0);
-          MODULE_BZK_RX.bl_KL1 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 4);
-          MODULE_BZK_RX.bl_KL2 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 5);
-          MODULE_BZK_RX.bl_KL3 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 6);
-          MODULE_BZK_RX.bl_KL4 = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 7);
+          MODULE_BZK_RX.bl_XP4_1_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 0);
+          MODULE_BZK_RX.bl_XP8_2_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 1);
+          MODULE_BZK_RX.bl_XP7_1_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 2);
+          MODULE_BZK_RX.bl_XP7_2_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 3);
+          MODULE_BZK_RX.bl_XP4_9_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 4);
+          MODULE_BZK_RX.bl_XP4_10_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 5);
+          MODULE_BZK_RX.bl_XP4_11_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 6);
+          MODULE_BZK_RX.bl_XP4_12_OUT = EPRO_Test_Bit(CAN_MESSAGE_RX->ui8_Data[2U], 7);
 
 
           return FALSE;
@@ -145,11 +149,16 @@ void MODULE_BZK_TX_MANAGER(bool_t bl_Enable, CAN_BUFFER_TX_t* CAN_BUFFER_TX)
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[0U] = (
           INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_9_IN) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_5_IN), 1) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_10_IN), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_6_IN), 3) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_7_IN), 4) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_8_IN), 5)
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_8_IN), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_2_IN), 6) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_3_IN), 7)
       );
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[1U] = (
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_4_IN) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_1_IN), 1) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_2_IN), 2) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_3_IN), 3) |
@@ -166,16 +175,19 @@ void MODULE_BZK_TX_MANAGER(bool_t bl_Enable, CAN_BUFFER_TX_t* CAN_BUFFER_TX)
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_3_OUT), 3) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_4_OUT), 4) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_5_OUT), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_6_OUT), 6)
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_6_OUT), 6) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP8_1_OUT), 7)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[3U] = (
           INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_1_OUT) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP8_2_OUT), 1) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_9_OUT), 2) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_10_OUT), 3) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_11_OUT), 4) |
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP4_12_OUT), 5) |
-          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP10_2_OUT), 6)
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP10_2_OUT), 6) |
+          SHL(INT_TO_UINT8(1), 7)
       );
 
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[4U] = (
@@ -189,9 +201,29 @@ void MODULE_BZK_TX_MANAGER(bool_t bl_Enable, CAN_BUFFER_TX_t* CAN_BUFFER_TX)
           SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP9_10_OUT), 7)
       );
 
-      CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = 0xFF;
+      CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[5U] = (
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP7_1_OUT) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP7_2_OUT), 1) |
+          SHL(INT_TO_UINT8(0), 2) |
+          SHL(INT_TO_UINT8(0), 3) |
+          SHL(INT_TO_UINT8(0), 4) |
+          SHL(INT_TO_UINT8(0), 5) |
+          SHL(INT_TO_UINT8(0), 6) |
+          SHL(INT_TO_UINT8(0), 7)
+      );
+
+
       CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[6U] = 0xFF;
-      CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[7U] = 0xFF;
+      CAN_BUFFER_TX->Message[CAN_BUFFER_TX->ui16_Buffer_End].ui8_Data[7U] = (
+          INT_TO_UINT8(MODULE_BZK_TX.bl_XP7_3_IN) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP7_4_IN), 1) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP7_6_IN), 2) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP2_1_IN), 3) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP8_3_IN), 4) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP8_4_IN), 5) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP8_6_IN), 6) |
+          SHL(INT_TO_UINT8(MODULE_BZK_TX.bl_XP11_4_IN), 7)
+      );
 
       CAN_BUFFER_TX->ui16_Buffer_End = (CAN_BUFFER_TX->ui16_Buffer_End + 1);
       if (CAN_BUFFER_TX->ui16_Buffer_End >= PROJECT_CAN_BUFFER_TX_SIZE)
